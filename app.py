@@ -1,8 +1,8 @@
 """
 The basic proof of concept for MailBroom
 
-SHows the following working together to make the initial part of this project possible:
-Flask for the local web interface, Google OAuth 2.0 for authorization, and the Gmail API for
+Shows the following working together to make the initial part of this project possible:
+Flask for the local web interface, Google OAuth for authorization, and the Gmail API for
 reading message metadata. This fetches headers only, groups all of the messages by sender and extracts the list
 unsubscribe header
 """
