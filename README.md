@@ -14,6 +14,8 @@ Parts of the full project that are not implemented here
 In order to interpret the Python code, we must complete a Google cloud setup to grant GoogleOAuth 2.0 access to our Gmail metadata. Without this step, the code is effectively useless as it does not have a Gmail inbox to process. 
 
 # Google cloud setup
+Video tutorial to make things easier: https://www.loom.com/share/be5a43789fe842c2b9cadb31cf1890b2
+
 Create a project at https://console.cloud.google.com
 Enable the Gmail API under APIs & Services -> library
 Under Google Auth Platform, configure the consent screen as external and add your own Gmail address under Audience (that you are comfortable with using for this test) -> Test users
