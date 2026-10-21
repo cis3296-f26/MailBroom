@@ -46,6 +46,19 @@ On the first run, the browser window will open and ask you to authorize access t
 
 The OAuth flow in `get_service()` follows Google's Gmail API Python quickstart: https://developers.google.com/gmail/api/quickstart/python
 
+
+## Build Instructions
+
+MailBroom is built using Python and Flask, so no separate compilation step is required. After cloning the repository, creating a Python virtual environment, and installing the dependencies from `requirements.txt`, the application is ready to run.
+
+To start the application, activate the virtual environment and execute:
+
+
+python3 app.py
+
+
+The Flask development server will start locally. Open http://127.0.0.1:5000 in a web browser to access MailBroom.
+
 ## Environment
 - Operating system: macOS 26.5.2
 - Python: 3.14.6
