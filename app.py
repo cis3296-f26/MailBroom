@@ -77,10 +77,13 @@ def index():
     display_limit = request.args.get("limit", default=-1, type=int)
 
     senders = collect_senders(get_service())
+    count=len(senders)   
+    total_msgs = sum(s["total"] for s in senders.values())
     rows = ""
     for address, stats in get_sender_view(senders, display_limit):
-        read = stats["total"] - stats["unread"]
-        rows += f"<li style='margin-bottom: 10px;'><b style='color: #D2042D;'>{address}</b><br><span style='color: #000000;'>{stats['total']} messages, {read} opened</span></li>"
+        read = stats["total"] - stats["unread"] 
+        tag = " <span style='color: #b45309; font-size: 0.85em;'>never opened</span>" if read == 0 else ""
+        rows += f"<li style='margin-bottom: 10px;'><b style='color: #D2042D;'>{address}</b>{tag}<br><span style='color: #000000;'>{stats['total']} messages, {read} opened</span></li>"
 
     form_html = f"""
         <form method="GET" action="/">
@@ -91,10 +94,18 @@ def index():
         <hr>
     """
 
-    return f"<h1>MailBroom</h1>{form_html}<p>Senders you can unsubscribe from:</p><ul>{rows}</ul>"
-
-    
-
+    return f"""
+    <div style="padding: 10px 0;">
+        <img src="/static/mailbroomlogo.png"
+            alt="MailBroom Logo"
+            style="width: 250px; height: auto;">
+    </div>
+    {form_html}
+    <p><u>{count} senders across {total_msgs} messages:</u></p>
+    <ul>{rows}</ul>
+    """
+      
 if __name__ == "__main__":
-    #the app is bound to localhost so the interface is only reachable from this machine.
     app.run(host="127.0.0.1", port=5000)
+    
+    
