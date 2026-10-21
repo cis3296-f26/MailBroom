@@ -11,7 +11,7 @@ import os
 import re
 from collections import defaultdict
 
-from flask import Flask
+from flask import Flask, request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -63,16 +63,37 @@ def collect_senders(service):
 
     return senders
 
+def get_sender_view(senders, limit = -1):
+    #Sort senders
+    senderDisplay = sorted(senders.items(), key=lambda s: -s[1]["total"])
+    #Limit senders display to limit, by default -1 (no limit)
+    if limit > 0: 
+        senderDisplay = senderDisplay[:limit]
+
+    return senderDisplay
 
 @app.route("/")
 def index():
+    display_limit = request.args.get("limit", default=-1, type=int)
+
     senders = collect_senders(get_service())
     rows = ""
-    for address, stats in sorted(senders.items(), key=lambda s: -s[1]["total"]):
+    for address, stats in get_sender_view(senders, display_limit):
         read = stats["total"] - stats["unread"]
         rows += f"<li><b>{address}</b> - {stats['total']} messages, {read} opened</li>"
-    return f"<h1>MailBroom</h1><p>Senders you can unsubscribe from:</p><ul>{rows}</ul>"
 
+    form_html = f"""
+        <form method="GET" action="/">
+            <label for="limit">Visible Senders:</label>
+            <input type="number" id="limit" name="limit" value="{display_limit}" min="1">
+            <button type="submit">Update</button>
+        </form>
+        <hr>
+    """
+
+    return f"<h1>MailBroom</h1>{form_html}<p>Senders you can unsubscribe from:</p><ul>{rows}</ul>"
+
+    
 
 if __name__ == "__main__":
     #the app is bound to localhost so the interface is only reachable from this machine.
