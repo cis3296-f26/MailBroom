@@ -80,7 +80,7 @@ def index():
     rows = ""
     for address, stats in get_sender_view(senders, display_limit):
         read = stats["total"] - stats["unread"]
-        rows += f"<li><b>{address}</b> - {stats['total']} messages, {read} opened</li>"
+        rows += f"<li style='margin-bottom: 10px;'><b style='color: #D2042D;'>{address}</b><br><span style='color: #000000;'>{stats['total']} messages, {read} opened</span></li>"
 
     form_html = f"""
         <form method="GET" action="/">
