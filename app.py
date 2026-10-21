@@ -70,8 +70,8 @@ def index():
     rows = ""
     for address, stats in sorted(senders.items(), key=lambda s: -s[1]["total"]):
         read = stats["total"] - stats["unread"]
-        rows += f"<li><b>{address}</b> - {stats['total']} messages, {read} opened</li>"
-    return f"<h1>MailBroom</h1><p>Senders you can unsubscribe from:</p><ul>{rows}</ul>"
+        rows += f"<li style='margin-bottom: 10px;'><b style='color: #D2042D;'>{address}</b><br><span style='color: #000000;'>{stats['total']} messages, {read} opened</span></li>"
+    return f"<h1>MailBroom</h1><p><u>Senders you can unsubscribe from:</u></p><ul>{rows}</ul>"
 
 
 if __name__ == "__main__":
