@@ -79,3 +79,9 @@ def index():
 if __name__ == "__main__":
     #the app is bound to localhost so the interface is only reachable from this machine.
     app.run(host="127.0.0.1", port=5000)
+
+
+total_senders = len(senders)
+total_msgs = sum(s["total"] for s in senders.values())
+#then in the return string, after the <h1>:
+f"<p>Found {total_senders} senders across {total_msgs} messages.</p>"
