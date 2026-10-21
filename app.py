@@ -67,11 +67,13 @@ def collect_senders(service):
 @app.route("/")
 def index():
     senders = collect_senders(get_service())
+    count=len(senders)
     rows = ""
     for address, stats in sorted(senders.items(), key=lambda s: -s[1]["total"]):
         read = stats["total"] - stats["unread"]
-        rows += f"<li style='margin-bottom: 10px;'><b style='color: #D2042D;'>{address}</b><br><span style='color: #000000;'>{stats['total']} messages, {read} opened</span></li>"
-    return f"<h1>MailBroom</h1><p><u>Senders you can unsubscribe from:</u></p><ul>{rows}</ul>"
+        tag = " <span style='color: #b45309; font-size: 0.85em;'>never opened</span>" if read == 0 else ""
+        rows += f"<li style='margin-bottom: 10px;'><b style='color: #222;'>{address}</b>{tag}<br><span style='color: #777;'>{stats['total']} messages, {read} opened</span></li>"
+    return f"<h1>MailBroom</h1><p><u>{count}Senders you can unsubscribe from:</u></p><ul>{rows}</ul>"
 
 
 if __name__ == "__main__":
