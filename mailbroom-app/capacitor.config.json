@@ -1,0 +1,12 @@
+{
+  "appId": "com.nathan.mailbroom",
+  "appName": "MailBroom",
+  "webDir": "dist",
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email", "https://mail.google.com/"],
+      "serverClientId": "661708702839-hflrfsisppcjbcbo7dimgjvsgq83461f.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
+  }
+}
