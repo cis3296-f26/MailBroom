@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "desktop": "npm run build && npx cap sync && npx cap open @capacitor-community/electron"
+    "desktop": "npm run build && npx cap copy @capacitor-community/electron && npx cap open @capacitor-community/electron"
   },
   "dependencies": {
     "@capacitor-community/electron": "^5.0.1",
