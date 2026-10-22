@@ -5,15 +5,15 @@ Initial project proposal for MailBroom, a Tinder-like email hygiene software tha
 This project has been migrated from a Python/Flask proof-of-concept to a **cross-platform architecture** using React (Vite), Capacitor, and Electron. This stack allows the application to run natively on Desktop (Windows/macOS/Linux) and Mobile (iOS/Android) from a single codebase.
 
 **Current Architecture Stack:**
-*   **Frontend:** React (built with Vite)
-*   **Desktop Wrapper:** Electron
-*   **Mobile Wrapper:** Capacitor
-*   **Authentication:** Google OAuth 2.0 (Google Identity Services & `google-auth-library`)
-*   **Data:** Gmail API
+- **Frontend:** React (built with Vite)
+- **Desktop Wrapper:** Electron
+- **Mobile Wrapper:** Capacitor
+- **Authentication:** Google OAuth 2.0 (Google Identity Services & `google-auth-library`)
+- **Data:** Gmail API
 
 ### Features Not Yet Implemented
-*   Sending the actual unsubscribe network request.
-*   Spam filtering after completing an unsubscribe request.
+- Sending the actual unsubscribe network request.
+- Spam filtering after completing an unsubscribe request.
 
 ---
 
@@ -36,22 +36,22 @@ In order to run MailBroom, you must grant the application Google OAuth 2.0 acces
 }
 ```
 
-> **Note:** `credentials.json` is listed in `.gitignore` and must not be committed to the repository.
+> **Note:** `credentials.json` is listed in `.gitignore` and must not be committed to the repository. If you are cloning this repository, duplicate `credentials.example.json`, rename it to `credentials.json`, and insert your keys.
 
 ---
 
 ## 2. Build Requirements
 
 To build and run this cross-platform application, you must have the following installed on your system:
-*   **Node.js** (v20 or higher recommended)
-*   **npm** (comes bundled with Node.js)
-*   *(Optional)* Xcode (for iOS builds) or Android Studio (for Android builds)
+- **Node.js** (v20 or higher recommended)
+- **npm** (comes bundled with Node.js)
+- *(Optional)* Xcode (for iOS builds) or Android Studio (for Android builds)
 
 ---
 
 ## 3. Installation & Build Instructions
 
-Because this is a React and Electron application, you must install the JavaScript dependencies and compile the frontend assets before running.
+Because this is a React and cross-platform application, you must install the JavaScript dependencies and compile the frontend assets before running.
 
 **1. Clone the repository and install dependencies:**
 ```bash 
@@ -68,12 +68,7 @@ cd ..
 ```
 
 **2. Build the React Frontend and Sync to Platforms:**
-Anytime you modify the React UI (`src/App.jsx`), you must rebuild the web assets and synchronize them to the native platforms (Electron, iOS, Android).
-
-For simplicity, a desktop build & run script exists
-```bash
-npm run desktop
-```
+Anytime you manually modify the React UI (`src/App.jsx`) outside of a live-reload environment, you must rebuild the web assets and synchronize them to the native platforms (Electron, iOS, Android).
 
 ```bash
 # Compile the React code into the /dist folder
@@ -88,22 +83,30 @@ npx cap sync
 ## 4. How to Run
 
 **To run the Desktop Application (Electron):**
-You must compile the Electron TypeScript backend once, and then you can launch the app.
+For simplicity, a custom script is provided that automatically builds the React frontend, copies the required assets to the desktop platform, and launches the Electron application. Ensure you are in the `mailbroom-app` root directory and run:
 
 ```bash
-cd electron
+npm run desktop
+```
 
-# Compile the Electron main process (index.ts)
+*(Alternatively, you can manually trigger the Capacitor commands for the desktop platform:)*
+```bash
 npm run build
-
-# Launch the desktop application
-npx electron .
+npx cap copy @capacitor-community/electron
+npx cap open @capacitor-community/electron
 ```
 
 On the first run, clicking **Login with Google** will open a secure OAuth window. Google will display a warning because the app is in testing mode—choose "Advanced" and "Continue". The application handles the OAuth redirect locally and securely stores the session token.
 
+**To run the Mobile Application (iOS/Android):**
+If you have Xcode or Android Studio installed and configured, you can launch the native mobile wrappers using Capacitor's run commands:
+```bash
+npx cap run ios
+npx cap run android
+```
+
 **To run for Web Development (React only):**
-If you are strictly designing the UI and want live-reloading in your browser without the Electron wrapper:
+If you are strictly designing the UI and want live-reloading in your browser without the Electron or Mobile wrappers:
 ```bash
 npm run dev
 ```
