@@ -7,9 +7,19 @@ import electronIsDev from 'electron-is-dev';
 import unhandled from 'electron-unhandled';
 import { autoUpdater } from 'electron-updater';
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 import { ElectronCapacitorApp, setupContentSecurityPolicy, setupReloadWatcher } from './setup';
 
-const oAuth2Client = new OAuth2Client('YOUR_DESKTOP_CLIENT_ID', 'YOUR_DESKTOP_CLIENT_SECRET', 'http://localhost/callback');
+const credentialsPath = path.join(__dirname, '../../../credentials.json');
+const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
+
+const oAuth2Client = new OAuth2Client(
+  credentials.CLIENT_ID, 
+  credentials.CLIENT_SECRET, 
+  'http://localhost/callback'
+);
 
 // Graceful handling of unhandled errors.
 unhandled();

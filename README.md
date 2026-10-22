@@ -1,65 +1,109 @@
 # MailBroom
-Initial project proposal for MailBroom, tinder-like email hygiene software that is hosted locally allowing the review and unsubscribing from unwanted Gmail communication.
 
-The proof of concept for the project proposal is intended to show how the stack works together:
-- Flask serves an interface hosted locally that opens in browser
-- Google OAuth 2.0 handles authorization
-- The Gmail API returns message metadata
+Initial project proposal for MailBroom, a Tinder-like email hygiene software that is hosted locally, allowing you to review and unsubscribe from unwanted Gmail communication using an intuitive swipe interface.
 
-Parts of the full project that are not implemented here
-- The interactive swipe interface that makes the project fun and tinder like
-- sending unsubscribe request
-- spam filtering after completing an unsubscribe request 
+This project has been migrated from a Python/Flask proof-of-concept to a **cross-platform architecture** using React (Vite), Capacitor, and Electron. This stack allows the application to run natively on Desktop (Windows/macOS/Linux) and Mobile (iOS/Android) from a single codebase.
 
-In order to interpret the Python code, we must complete a Google cloud setup to grant GoogleOAuth 2.0 access to our Gmail metadata. Without this step, the code is effectively useless as it does not have a Gmail inbox to process. 
+**Current Architecture Stack:**
+*   **Frontend:** React (built with Vite)
+*   **Desktop Wrapper:** Electron
+*   **Mobile Wrapper:** Capacitor
+*   **Authentication:** Google OAuth 2.0 (Google Identity Services & `google-auth-library`)
+*   **Data:** Gmail API
 
-# Google cloud setup
-Video tutorial to make things easier: https://www.loom.com/share/be5a43789fe842c2b9cadb31cf1890b2
+### Features Not Yet Implemented
+*   Sending the actual unsubscribe network request.
+*   Spam filtering after completing an unsubscribe request.
 
-Create a project at https://console.cloud.google.com
-Enable the Gmail API under APIs & Services -> library
-Under Google Auth Platform, configure the consent screen as external and add your own Gmail address under Audience (that you are comfortable with using for this test) -> Test users
-Under clients, create an OAuth client of type Desktop app
-Download the JSON file, rename it to 'credentials.json', and place it in the root of this repository
+---
 
-`credentials.json` and `token.json` are listed in `.gitignore` and must not be committed.
+## 1. Google Cloud Setup (Prerequisite)
 
-## Now we need to install and run the program 
+In order to run MailBroom, you must grant the application Google OAuth 2.0 access to your Gmail metadata. Without this step, the code cannot fetch your inbox.
 
-```bash 
-git clone https://github.com/cis3296-f26/MailBroom.git 
+1. Create a project at [Google Cloud Console](https://console.cloud.google.com).
+2. Enable the **Gmail API** under *APIs & Services -> Library*.
+3. Under *OAuth consent screen*, configure it as **External**. Add a test Gmail address you are comfortable using under *Test users*.
+4. Under *Credentials*, create a new OAuth client of type **Web application** (Do *not* select Desktop app).
+5. Set the **Authorized JavaScript origins** to `http://localhost`.
+6. Set the **Authorized redirect URIs** to `http://localhost/callback`.
+7. Create a file named `credentials.json` in the root of the `mailbroom-app` directory and paste your keys into this exact format:
 
-cd MailBroom 
-
-python3 -m venv venv
-
-source venv/bin/activate
-
-pip install -r requirements.txt 
-
-python3 app.py
+```json
+{
+  "CLIENT_ID": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+  "CLIENT_SECRET": "YOUR_CLIENT_SECRET"
+}
 ```
 
-Then open http://127.0.0.1:5000 in a browser.
+> **Note:** `credentials.json` is listed in `.gitignore` and must not be committed to the repository.
 
-On the first run, the browser window will open and ask you to authorize access to your Gmail account. Google displays a warning, choose "Advanced and continue". The token is saved to `token.json` so later runs do not prompt.
+---
 
-The OAuth flow in `get_service()` follows Google's Gmail API Python quickstart: https://developers.google.com/gmail/api/quickstart/python
+## 2. Build Requirements
 
+To build and run this cross-platform application, you must have the following installed on your system:
+*   **Node.js** (v20 or higher recommended)
+*   **npm** (comes bundled with Node.js)
+*   *(Optional)* Xcode (for iOS builds) or Android Studio (for Android builds)
 
-## Build Instructions
+---
 
-MailBroom is built using Python and Flask, so no separate compilation step is required. After cloning the repository, creating a Python virtual environment, and installing the dependencies from `requirements.txt`, the application is ready to run.
+## 3. Installation & Build Instructions
 
-To start the application, activate the virtual environment and execute:
+Because this is a React and Electron application, you must install the JavaScript dependencies and compile the frontend assets before running.
 
+**1. Clone the repository and install dependencies:**
+```bash 
+git clone https://github.com/cis3296-f26/MailBroom.git 
+cd MailBroom/mailbroom-app
 
-python3 app.py
+# Install standard React and Capacitor dependencies
+npm install 
 
+# Install specific Electron desktop dependencies
+cd electron
+npm install
+cd ..
+```
 
-The Flask development server will start locally. Open http://127.0.0.1:5000 in a web browser to access MailBroom.
+**2. Build the React Frontend and Sync to Platforms:**
+Anytime you modify the React UI (`src/App.jsx`), you must rebuild the web assets and synchronize them to the native platforms (Electron, iOS, Android).
 
-## Environment
-- Operating system: macOS 26.5.2
-- Python: 3.14.6
-- Framework: Flask 3.1.3
+For simplicity, a desktop build & run script exists
+```bash
+npm run desktop
+```
+
+```bash
+# Compile the React code into the /dist folder
+npm run build
+
+# Copy the compiled code into the Electron and Mobile native folders
+npx cap sync
+```
+
+---
+
+## 4. How to Run
+
+**To run the Desktop Application (Electron):**
+You must compile the Electron TypeScript backend once, and then you can launch the app.
+
+```bash
+cd electron
+
+# Compile the Electron main process (index.ts)
+npm run build
+
+# Launch the desktop application
+npx electron .
+```
+
+On the first run, clicking **Login with Google** will open a secure OAuth window. Google will display a warning because the app is in testing mode—choose "Advanced" and "Continue". The application handles the OAuth redirect locally and securely stores the session token.
+
+**To run for Web Development (React only):**
+If you are strictly designing the UI and want live-reloading in your browser without the Electron wrapper:
+```bash
+npm run dev
+```

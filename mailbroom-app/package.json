@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "desktop": "npm run build && npx cap sync && npx cap open @capacitor-community/electron"
   },
   "dependencies": {
     "@capacitor-community/electron": "^5.0.1",
@@ -24,6 +25,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.88.0",
+    "typescript": "^7.0.2",
     "vite": "^8.3.4"
   }
 }
