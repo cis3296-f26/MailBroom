@@ -1,5 +1,56 @@
+# =========================
+# 1. SECRETS & CREDENTIALS
+# =========================
+# (From your original setup)
 credentials.json
 token.json
+.env
+.env.*
+.env.local
+
+# =========================
+# 2. PYTHON / FLASK (Original Backend)
+# =========================
 venv/
+env/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# =========================
+# 3. NODE.JS DEPENDENCIES (New Frontend)
+# =========================
+node_modules/
+electron/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# 4. REACT & VITE BUILD OUTPUT
+# =========================
+dist/
+dist-tsc/
+
+# =========================
+# 5. ELECTRON BUILD OUTPUT
+# =========================
+electron/app/
+electron/dist/
+electron/out/
+electron/build/
+
+# =========================
+# 6. SYSTEM & EDITOR FILES
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
