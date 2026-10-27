@@ -95,6 +95,12 @@ def index():
     """
 
     return f"""
+
+    <div style="position: fixed; top: 20px; right: 20px; z-index: 9999;">
+        <img src="/static/button.png" alt="Close App" onclick="window.close();" style="cursor: pointer; width: 150px;" />
+    </div>
+
+    
     <div style="padding: 10px 0;">
         <img src="/static/mailbroomlogo.png"
             alt="MailBroom Logo"
