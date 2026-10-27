@@ -224,8 +224,8 @@ export function setupContentSecurityPolicy(customScheme: string): void {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           electronIsDev
-            ? `default-src ${customScheme}://* 'unsafe-inline' devtools://* 'unsafe-eval' data:`
-            : `default-src ${customScheme}://* 'unsafe-inline' data:`,
+            ? `default-src ${customScheme}://* 'unsafe-inline' devtools://* 'unsafe-eval' data:; connect-src ${customScheme}://* devtools://* https://gmail.googleapis.com`
+            : `default-src ${customScheme}://* 'unsafe-inline' data:; connect-src ${customScheme}://* https://gmail.googleapis.com`,
         ],
       },
     });

@@ -4,7 +4,9 @@ require('./rt/electron-rt');
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('desktopAPI', {
-  loginWithGoogle: () => ipcRenderer.invoke('electron-google-login')
+  loginWithGoogle: () => ipcRenderer.invoke('electron-google-login'),
+  unsubscribe: (args: { url: string; oneClick: boolean }) =>
+    ipcRenderer.invoke('unsubscribe-https', args),
 });
 
 console.log('User Preload!');

@@ -1,7 +1,7 @@
 import type { CapacitorElectronConfig } from '@capacitor-community/electron';
 import { getCapacitorElectronConfig, setupElectronDeepLinking } from '@capacitor-community/electron';
 import type { MenuItemConstructorOptions } from 'electron';
-import { app, MenuItem, BrowserWindow, ipcMain } from 'electron';
+import { app, MenuItem, BrowserWindow, ipcMain, shell } from 'electron';
 import { OAuth2Client } from 'google-auth-library';
 import electronIsDev from 'electron-is-dev';
 import unhandled from 'electron-unhandled';
@@ -111,3 +111,17 @@ app.on('activate', async function () {
 });
 
 // Place all ipc or other electron api calls and custom functionality under this line
+
+ipcMain.handle('unsubscribe-https', async (_event, { url, oneClick }) => {
+  if (!url.startsWith('https://')) return { ok: false, error: 'Not an https link' };
+  if (oneClick) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'List-Unsubscribe=One-Click',
+    });
+    return { ok: res.ok };
+  }
+  await shell.openExternal(url); // let the user confirm on the site
+  return { ok: true, opened: true };
+});
