@@ -90,7 +90,24 @@ def index():
             <label for="limit">Visible Senders:</label>
             <input type="number" id="limit" name="limit" value="{display_limit}" min="1">
             <button type="submit">Update</button>
+            <button
+                type="button"
+                class="broom-refresh"
+                title="Refresh emails"
+                aria-label="Refresh emails"
+                onclick="this.disabled = true; this.querySelector('.broom-icon').classList.add('spinning')"
+            >
+                <svg
+                    class="broom-icon"
+                    viewBox="610 115 260 450"
+                    aria-hidden="true"
+                    onanimationend="sessionStorage.setItem('mailbroom-refreshed', 'true'); window.location.reload()"
+                >
+                    <image href="/static/Broom.png" width="2048" height="691" />
+                </svg>
+            </button>
         </form>
+        <p id="refresh-status" role="status" hidden>Emails refreshed!</p>
         <hr>
     """
 
@@ -101,6 +118,8 @@ def index():
     </div>
 
     
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/refresh.js" defer></script>
     <div style="padding: 10px 0;">
         <img src="/static/mailbroomlogo.png"
             alt="MailBroom Logo"
