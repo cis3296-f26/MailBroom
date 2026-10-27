@@ -112,6 +112,12 @@ def index():
     """
 
     return f"""
+
+    <div style="position: fixed; top: 20px; right: 20px; z-index: 9999;">
+        <img src="/static/button.png" alt="Close App" onclick="window.close();" style="cursor: pointer; width: 150px;" />
+    </div>
+
+    
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/refresh.js" defer></script>
     <div style="padding: 10px 0;">
