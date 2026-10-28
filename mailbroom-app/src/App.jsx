@@ -145,6 +145,11 @@ export default function App() {
     }
   };
 
+    const handleDecision = (sender, action) => {
+    if (action === 'unsubscribe') handleUnsubscribe(sender);
+    else setStatus(`Kept ${sender.from}`);
+  };
+
   return (
     <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif' }}>
       <h1>MailBroom</h1>
@@ -157,13 +162,13 @@ export default function App() {
         <div>
           {loading && <p>Loading your emails...</p>}
           {status && <p>{status}</p>}
-          {senders.map((s) => (
-            <div key={s.from} style={{ margin: '10px auto', maxWidth: 500, display: 'flex', justifyContent: 'space-between' }}>
-              <span>{s.from} ({s.count})</span>
-              <button onClick={() => handleUnsubscribe(s)}>Unsubscribe</button>
-            </div>
-          ))}
-          {!loading && !status && senders.length === 0 && <p>No senders with an unsubscribe option in your 50 most recent emails.</p>}
+                    {!loading && senders.length > 0 && (
+            <SenderCard senders={senders} onDecision={handleDecision} />
+          )}
+
+          {!loading && senders.length === 0 && (
+            <p>No senders with an unsubscribe option in your 50 most recent emails.</p>
+          )}
         </div>
       )}
     </div>
