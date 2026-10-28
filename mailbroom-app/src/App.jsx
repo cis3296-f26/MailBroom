@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import './App.css';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
@@ -24,6 +25,39 @@ async function sendMailto(token, mailto) {
     body: JSON.stringify({ raw: encoded }),
   });
   return res.ok;
+}
+
+function SenderCard({ senders, onDecision }) {
+  const [i, setI] = useState(0);
+  const sender = senders[i];
+
+  const decide = (action) => {
+    onDecision?.(sender, action);
+    setI(n => n + 1);
+  };
+
+  if (!sender) {
+    return <p className="card-done">All done. Reviewed {i} senders.</p>;
+  }
+
+  return (
+    <>
+      <div className="card-progress">{i} of {senders.length} reviewed</div>
+
+      <div className="card">
+        <div className="card-from">{sender.from}</div>
+        <div className="card-stats">
+          {sender.count} message{sender.count === 1 ? '' : 's'} · {sender.opened} opened
+        </div>
+        {sender.opened === 0 && <div className="card-never">never opened</div>}
+      </div>
+
+      <div className="card-buttons">
+        <button className="btn-unsub" onClick={() => decide('unsubscribe')}>Unsubscribe</button>
+        <button className="btn-keep" onClick={() => decide('keep')}>Keep</button>
+      </div>
+    </>
+  );
 }
 
 export default function App() {
@@ -69,11 +103,21 @@ export default function App() {
         if (!h['list-unsubscribe']) continue; // skip senders with no unsubscribe option
         const from = h['from'];
         if (!bySender[from]) {
-          bySender[from] = { from, count: 0, ...parseUnsubscribe(h['list-unsubscribe'], h['list-unsubscribe-post']) };
+                    bySender[from] = {
+            from,
+            count: 0,
+            unread: 0,
+            ...parseUnsubscribe(h['list-unsubscribe'], h['list-unsubscribe-post']),
+          };
+          
         }
         bySender[from].count++;
+        if ((msg.labelIds || []).includes('UNREAD')) bySender[from].unread++;
       }
-      setSenders(Object.values(bySender));
+            const ranked = Object.values(bySender)
+        .map((s) => ({ ...s, opened: s.count - s.unread }))
+        .sort((a, b) => b.count - a.count);
+        setSenders(ranked);
     } catch (err) {
       console.error('Failed to load emails:', err);
       setStatus('Failed to load emails. Check the console.');
@@ -101,6 +145,11 @@ export default function App() {
     }
   };
 
+    const handleDecision = (sender, action) => {
+    if (action === 'unsubscribe') handleUnsubscribe(sender);
+    else setStatus(`Kept ${sender.from}`);
+  };
+
   return (
     <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif' }}>
       <h1>MailBroom</h1>
@@ -113,13 +162,13 @@ export default function App() {
         <div>
           {loading && <p>Loading your emails...</p>}
           {status && <p>{status}</p>}
-          {senders.map((s) => (
-            <div key={s.from} style={{ margin: '10px auto', maxWidth: 500, display: 'flex', justifyContent: 'space-between' }}>
-              <span>{s.from} ({s.count})</span>
-              <button onClick={() => handleUnsubscribe(s)}>Unsubscribe</button>
-            </div>
-          ))}
-          {!loading && !status && senders.length === 0 && <p>No senders with an unsubscribe option in your 50 most recent emails.</p>}
+                    {!loading && senders.length > 0 && (
+            <SenderCard senders={senders} onDecision={handleDecision} />
+          )}
+
+          {!loading && senders.length === 0 && (
+            <p>No senders with an unsubscribe option in your 50 most recent emails.</p>
+          )}
         </div>
       )}
     </div>
