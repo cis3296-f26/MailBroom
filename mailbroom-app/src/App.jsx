@@ -103,11 +103,21 @@ export default function App() {
         if (!h['list-unsubscribe']) continue; // skip senders with no unsubscribe option
         const from = h['from'];
         if (!bySender[from]) {
-          bySender[from] = { from, count: 0, ...parseUnsubscribe(h['list-unsubscribe'], h['list-unsubscribe-post']) };
+                    bySender[from] = {
+            from,
+            count: 0,
+            unread: 0,
+            ...parseUnsubscribe(h['list-unsubscribe'], h['list-unsubscribe-post']),
+          };
+          
         }
         bySender[from].count++;
+        if ((msg.labelIds || []).includes('UNREAD')) bySender[from].unread++;
       }
-      setSenders(Object.values(bySender));
+            const ranked = Object.values(bySender)
+        .map((s) => ({ ...s, opened: s.count - s.unread }))
+        .sort((a, b) => b.count - a.count);
+        setSenders(ranked);
     } catch (err) {
       console.error('Failed to load emails:', err);
       setStatus('Failed to load emails. Check the console.');
