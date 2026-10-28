@@ -113,17 +113,17 @@ def index():
 
     return f"""
 
-    <div style="position: fixed; top: 20px; right: 20px; z-index: 9999;">
-        <img src="/static/button.png" alt="Close App" onclick="window.close();" style="cursor: pointer; width: 150px;" />
-    </div>
-
-    
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/refresh.js" defer></script>
-    <div style="padding: 10px 0;">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
         <img src="/static/mailbroomlogo.png"
             alt="MailBroom Logo"
             style="width: 250px; height: auto;">
+
+        <img src="/static/xout.png" alt="Close App" onclick="window.close();" 
+            style="cursor: pointer; height: 90px; width: 90px; object-fit: contain; transition: transform 0.2s;" 
+            onmouseover="this.style.transform='scale(1.2) rotate(15deg)'" 
+            onmouseout="this.style.transform='scale(1) rotate(0deg)'" />
     </div>
     {form_html}
     <p><u>{count} senders across {total_msgs} messages:</u></p>
