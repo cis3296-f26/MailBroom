@@ -1,6 +1,6 @@
 {
   "name": "MailBroom",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "description": "An Amazing Capacitor App",
   "author": {
     "name": "",
@@ -16,8 +16,9 @@
     "build": "tsc && electron-rebuild",
     "electron:start-live": "node ./live-runner.js",
     "electron:start": "npm run build && electron --inspect=5858 ./",
-    "electron:pack": "npm run build && electron-builder build --dir -c ./electron-builder.config.json",
-    "electron:make": "npm run build && electron-builder build -c ./electron-builder.config.json -p always"
+    "electron:pack": "npm run build && electron-builder build --dir",
+    "electron:make": "npm run build && electron-builder build -p never",
+    "electron:portable": "npm run build && electron-builder build --win portable -p never"
   },
   "dependencies": {
     "@capacitor-community/electron": "^5.0.0",

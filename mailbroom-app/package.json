@@ -1,14 +1,18 @@
 {
   "name": "mailbroom-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "desktop": "npm run build && npx cap copy @capacitor-community/electron && npx cap open @capacitor-community/electron"
+    "desktop": "npm run build && npx cap copy @capacitor-community/electron && npx cap open @capacitor-community/electron",
+    "electron:sync": "npm run build && npx cap copy @capacitor-community/electron && node -e \"require('fs').copyFileSync('credentials.json', 'electron/credentials.json')\"",
+    "electron:pack": "npm run electron:sync && npm --prefix electron run electron:pack",
+    "electron:build": "npm run electron:sync && npm --prefix electron run electron:make",
+    "electron:portable": "npm run electron:sync && npm --prefix electron run electron:portable"
   },
   "dependencies": {
     "@capacitor-community/electron": "^5.0.1",
