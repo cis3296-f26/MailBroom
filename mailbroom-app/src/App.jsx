@@ -181,12 +181,14 @@ export default function App() {
           {loading && <p>Loading your emails...</p>}
           {status && <p>{status}</p>}
             
+          <div className="undo-container">
             {pending.map((s) => (
               <div key={s.from} className="undo-bar">
-              Unsubscribing from {s.from}...{' '}
-              <button onClick={() => undoUnsubscribe(s)}>Undo</button>
-            </div>
-          ))}
+                Unsubscribing from {s.from}...{' '}
+                <button onClick={() => undoUnsubscribe(s)}>Undo</button>
+              </div>
+            ))}
+          </div>
           
           {!loading && senders.length > 0 && (
             <SenderCard senders={senders} onDecision={handleDecision} />
