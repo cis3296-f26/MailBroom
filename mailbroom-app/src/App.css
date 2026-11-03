@@ -222,3 +222,11 @@
 .btn-keep  { color: #16a34a; border-color: #16a34a; }
  
 .card-done { text-align: center; color: #6b7280; padding: 40px 0; }
+
+.undo-bar {
+  margin: 10px auto;
+  padding: 8px 12px;
+  max-width: 400px;
+  background: #fff3cd;
+  border-radius: 6px;
+}
