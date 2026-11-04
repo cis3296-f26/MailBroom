@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isAlreadyUnsubscribed, saveUnsubscribedEmail } from './storage';
 import './App.css';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -117,6 +118,14 @@ export default function App() {
             const ranked = Object.values(bySender)
         .map((s) => ({ ...s, opened: s.count - s.unread }))
         .sort((a, b) => b.count - a.count);
+
+        //filters the email you already unsubscribed from
+      const filtered = [];
+      for (const s of ranked) {
+        if (!(await isAlreadyUnsubscribed(s.from))){
+          filtered.push(s);
+        }
+      }
         setSenders(ranked);
     } catch (err) {
       console.error('Failed to load emails:', err);
@@ -128,6 +137,8 @@ export default function App() {
 
   const handleUnsubscribe = async (s) => {
     try {
+      await saveUnsubscribedEmail(s.form); //save to mem when they click unsubscribed
+      
       if (s.https) {
         if (window.desktopAPI?.unsubscribe) {
           const result = await window.desktopAPI.unsubscribe({ url: s.https, oneClick: s.oneClick });
