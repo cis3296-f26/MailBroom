@@ -20,7 +20,7 @@ jobs:
           - os: windows-latest
             platform: --win
           - os: macos-latest
-            platform: --mac
+            platform: --mac --universal
           - os: ubuntu-latest
             platform: --linux
 

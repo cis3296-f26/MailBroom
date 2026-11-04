@@ -20,7 +20,7 @@
     "electron:make": "npm run build && electron-builder build -p never",
     "electron:portableWin": "npm run build && electron-builder build --win portable -p never",
     "electron:portableLinux": "npm run build && electron-builder build --linux appImage -p never",
-    "electron:portableMac": "npm run build && electron-builder build --mac dmg -p never"
+    "electron:portableMac": "npm run build && electron-builder build --mac dmg --universal -p never"
   },
   "dependencies": {
     "@capacitor-community/electron": "^5.0.0",
