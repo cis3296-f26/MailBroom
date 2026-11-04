@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { isAlreadyUnsubscribed, saveUnsubscribedEmail, isAlreadyKept, saveKeptEmail, removeUnsubscribedEmail } from './storage';
 import './App.css';
 import RefreshLogo from '@components/RefreshLogo';
 
@@ -182,7 +183,17 @@ export default function App() {
             const ranked = Object.values(bySender)
         .map((s) => ({ ...s, opened: s.count - s.unread }))
         .sort((a, b) => b.count - a.count);
-        setSenders(ranked);
+
+        //filters the email you already unsubscribed from
+      const filtered = [];
+      for (const s of ranked) {
+          const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+          if (!(await isAlreadyUnsubscribed(cleanEmail)) && !(await isAlreadyKept(cleanEmail))) 
+            {
+             filtered.push(s);
+          }
+      }
+setSenders(filtered);
     } catch (err) {
       console.error('Failed to load emails:', err);
       setStatus('Failed to load emails. Check the console.');
@@ -192,6 +203,9 @@ export default function App() {
 
   const handleUnsubscribe = async (s) => {
     try {
+      const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+      await saveUnsubscribedEmail(cleanEmail); //save to mem when they click unsubscribed
+      
       if (s.https) {
         if (window.desktopAPI?.unsubscribe) {
           const result = await window.desktopAPI.unsubscribe({ url: s.https, oneClick: s.oneClick });
@@ -211,7 +225,11 @@ export default function App() {
       setFailed((f) => [...f, s.from]);
     }
   };
-    const scheduleUnsubscribe = (s) => {
+    const scheduleUnsubscribe = async (s) => {
+
+    const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+    await saveUnsubscribedEmail(cleanEmail);
+    
     setPending((p) => [...p, s]);
     timers.current[s.from] = setTimeout(() => {
       delete timers.current[s.from];
@@ -220,16 +238,28 @@ export default function App() {
     }, UNDO_MS);
   };
 
-  const undoUnsubscribe = (s) => {
+  const undoUnsubscribe = async (s) => {
     clearTimeout(timers.current[s.from]);
     delete timers.current[s.from];
     setPending((p) => p.filter((x) => x.from !== s.from));
+    
+    // REMOVE FROM YOUR MEMORY
+    const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+    await removeUnsubscribedEmail(cleanEmail);
+
     setStatus(`Cancelled unsubscribe for ${s.from}`);
   };
 
-  const handleDecision = (sender, action) => {
-    if (action === 'unsubscribe') scheduleUnsubscribe(sender);
-    else setStatus(`Kept ${sender.from}`);
+  const handleDecision = async (sender, action) => {
+    const cleanEmail = sender.from.match(/<([^>]+)>/)?.[1] || sender.from;
+    
+    if (action === 'unsubscribe') {
+      scheduleUnsubscribe(sender); // This starts her timer
+    } else {
+      await saveKeptEmail(cleanEmail); 
+      setStatus(`Kept ${sender.from}`);
+    }
+  
   };
 
   return (
