@@ -62,6 +62,7 @@ function SenderCard({ senders, onDecision }) {
 
 export default function App() {
   const [token, setToken] = useState(null);
+  const [failed, setFailed] = useState([]);
   const [senders, setSenders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
@@ -132,16 +133,19 @@ export default function App() {
         if (window.desktopAPI?.unsubscribe) {
           const result = await window.desktopAPI.unsubscribe({ url: s.https, oneClick: s.oneClick });
           setStatus(result.ok ? `Unsubscribe sent for ${s.from}` : `Failed: ${result.error || result.status}`);
+          if (!result.ok) setFailed((f) => [...f, s.from]);
         } else {
           window.open(s.https, '_blank');
         }
       } else if (s.mailto) {
         const ok = await sendMailto(token, s.mailto);
         setStatus(ok ? `Unsubscribe email sent to ${s.from}` : 'Failed to send unsubscribe email');
+        if (!ok) setFailed((f) => [...f, s.from]);
       }
     } catch (err) {
       console.error(err);
       setStatus('Unsubscribe failed. Check the console.');
+      setFailed((f) => [...f, s.from]);
     }
   };
 
@@ -164,6 +168,12 @@ export default function App() {
           {status && <p>{status}</p>}
                     {!loading && senders.length > 0 && (
             <SenderCard senders={senders} onDecision={handleDecision} />
+          )}
+                    {failed.length > 0 && (
+            <div className="card-failed">
+              <p>Couldn't unsubscribe from {failed.length}:</p>
+              <ul>{failed.map((f) => <li key={f}>{f}</li>)}</ul>
+            </div>
           )}
 
           {!loading && senders.length === 0 && (
