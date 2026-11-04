@@ -223,6 +223,28 @@
  
 .card-done { text-align: center; color: #6b7280; padding: 40px 0; }
 
+/*This is for the swipe gestures*/
+.card {
+  position: relative;
+  cursor: grab;
+  touch-action: none;    
+  user-select: none;
+}
+.card:active { cursor: grabbing; }
+
+.verdict {
+  position: absolute;
+  top: 16px;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 3px solid;
+  opacity: 0;
+  pointer-events: none;
+}
+.verdict-no  { left: 16px;  color: #D2042D; border-color: #D2042D; transform: rotate(-12deg); }
+.verdict-yes { right: 16px; color: #16a34a; border-color: #16a34a; transform: rotate(12deg); }
 .undo-container {
   position: fixed;
   bottom: 20px;

@@ -29,13 +29,61 @@ async function sendMailto(token, mailto) {
   return res.ok;
 }
 
+//px of horizontal drag  
+const THRESHOLD = 110;   
+
 function SenderCard({ senders, onDecision }) {
   const [i, setI] = useState(0);
   const sender = senders[i];
 
+  const drag = useRef({ active: false, startX: 0, dx: 0 });
+  const card = useRef(null);
+
   const decide = (action) => {
     onDecision?.(sender, action);
     setI(n => n + 1);
+  };
+
+  //slide the card off screen in the chosen direction, then advance
+  const flyOut = (action) => {
+    const el = card.current;
+    if (!el) return decide(action);
+    const x = action === 'unsubscribe' ? -600 : 600;
+    el.style.transition = 'transform .3s ease, opacity .3s ease';
+    el.style.transform = `translate(${x}px, 40px) rotate(${x / 18}deg)`;
+    el.style.opacity = 0;
+    setTimeout(() => decide(action), 280);
+  };
+
+  const onPointerDown = (e) => {
+    drag.current = { active: true, startX: e.clientX, dx: 0 };
+    card.current.setPointerCapture(e.pointerId);   
+    card.current.style.transition = 'none';
+  };
+
+  const onPointerMove = (e) => {
+    if (!drag.current.active) return;
+    const dx = (drag.current.dx = e.clientX - drag.current.startX);
+    card.current.style.transform = `translate(${dx}px, 0) rotate(${dx / 18}deg)`;
+
+    //fade in whichever label matches the direction of travel
+    const strength = Math.min(Math.abs(dx) / THRESHOLD, 1);
+    card.current.querySelector('.verdict-no').style.opacity = dx < 0 ? strength : 0;
+    card.current.querySelector('.verdict-yes').style.opacity = dx > 0 ? strength : 0;
+  };
+
+  const onPointerUp = () => {
+    const { active, dx } = drag.current;
+    if (!active) return;
+    drag.current.active = false;
+
+    if (Math.abs(dx) > THRESHOLD) return flyOut(dx < 0 ? 'unsubscribe' : 'keep');
+
+    //if you didnt drag far enogh then the card snaps back into place
+    card.current.style.transition = 'transform .3s ease';
+    card.current.style.transform = 'translate(0,0) rotate(0)';
+    card.current.querySelector('.verdict-no').style.opacity = 0;
+    card.current.querySelector('.verdict-yes').style.opacity = 0;
   };
 
   if (!sender) {
@@ -46,7 +94,18 @@ function SenderCard({ senders, onDecision }) {
     <>
       <div className="card-progress">{i} of {senders.length} reviewed</div>
 
-      <div className="card">
+      {/* key gives each sender a fresh node, so the flown-out styles don't carry over */}
+      <div
+        key={sender.from}
+        ref={card}
+        className="card"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        <div className="verdict verdict-no">UNSUBSCRIBE</div>
+        <div className="verdict verdict-yes">KEEP</div>
+
         <div className="card-from">{sender.from}</div>
         <div className="card-stats">
           {sender.count} message{sender.count === 1 ? '' : 's'} · {sender.opened} opened
@@ -55,15 +114,17 @@ function SenderCard({ senders, onDecision }) {
       </div>
 
       <div className="card-buttons">
-        <button className="btn-unsub" onClick={() => decide('unsubscribe')}>Unsubscribe</button>
-        <button className="btn-keep" onClick={() => decide('keep')}>Keep</button>
+        <button className="btn-unsub" onClick={() => flyOut('unsubscribe')}>Unsubscribe</button>
+        <button className="btn-keep" onClick={() => flyOut('keep')}>Keep</button>
       </div>
     </>
   );
 }
 
+
 export default function App() {
   const [token, setToken] = useState(null);
+  const [failed, setFailed] = useState([]);
   const [senders, setSenders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
@@ -135,16 +196,19 @@ export default function App() {
         if (window.desktopAPI?.unsubscribe) {
           const result = await window.desktopAPI.unsubscribe({ url: s.https, oneClick: s.oneClick });
           setStatus(result.ok ? `Unsubscribe sent for ${s.from}` : `Failed: ${result.error || result.status}`);
+          if (!result.ok) setFailed((f) => [...f, s.from]);
         } else {
           window.open(s.https, '_blank');
         }
       } else if (s.mailto) {
         const ok = await sendMailto(token, s.mailto);
         setStatus(ok ? `Unsubscribe email sent to ${s.from}` : 'Failed to send unsubscribe email');
+        if (!ok) setFailed((f) => [...f, s.from]);
       }
     } catch (err) {
       console.error(err);
       setStatus('Unsubscribe failed. Check the console.');
+      setFailed((f) => [...f, s.from]);
     }
   };
     const scheduleUnsubscribe = (s) => {
@@ -169,12 +233,11 @@ export default function App() {
   };
 
   return (
-    <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif' }}>
-      <div style={{display: 'flex', flexDirection: 'row', justifyContent:'center'}}>
-        <h1>MailBroom</h1>
-        {token ? (<RefreshLogo size={60} onRefresh={() => loadSenders(token)} />) : null}
-      </div>
-
+      <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif', overflowX: 'hidden' }}>
+        <div style={{display: 'flex', flexDirection: 'row', justifyContent:'center'}}>
+          <h1>MailBroom</h1>
+          {token ? (<RefreshLogo size={60} onRefresh={() => loadSenders(token)} />) : null}
+        </div>
 
       {!token ? (
         <button onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
@@ -196,6 +259,12 @@ export default function App() {
           
           {!loading && senders.length > 0 && (
             <SenderCard senders={senders} onDecision={handleDecision} />
+          )}
+                    {failed.length > 0 && (
+            <div className="card-failed">
+              <p>Couldn't unsubscribe from {failed.length}:</p>
+              <ul>{failed.map((f) => <li key={f}>{f}</li>)}</ul>
+            </div>
           )}
 
           {!loading && senders.length === 0 && (
