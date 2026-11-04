@@ -12,14 +12,34 @@ import * as path from 'path';
 
 import { ElectronCapacitorApp, setupContentSecurityPolicy, setupReloadWatcher } from './setup';
 
-const credentialsPath = path.join(__dirname, '../../../credentials.json');
-const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
+const appPathCredentials = path.join(app.getAppPath(), 'credentials.json');
+const devPathCredentials = path.join(__dirname, '../../../credentials.json');
+const credentialsPath = fs.existsSync(appPathCredentials)
+  ? appPathCredentials
+  : devPathCredentials;
 
-const oAuth2Client = new OAuth2Client(
-  credentials.CLIENT_ID, 
-  credentials.CLIENT_SECRET, 
-  'http://localhost/callback'
-);
+let credentials: { CLIENT_ID: string; CLIENT_SECRET: string } = { CLIENT_ID: '', CLIENT_SECRET: '' };
+if (fs.existsSync(credentialsPath)) {
+  try {
+    credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
+  } catch (err) {
+    console.error(`Failed to parse credentials at ${credentialsPath}:`, err);
+  }
+} else {
+  console.warn(`credentials.json not found at: ${credentialsPath}`);
+}
+
+const oAuth2Client = new OAuth2Client({
+  clientId: credentials.CLIENT_ID, 
+  clientSecret: credentials.CLIENT_SECRET, 
+  redirectUri: 'http://localhost/callback',
+  transporterOptions: {
+    fetchImplementation: fetch,
+  },
+});
+if (oAuth2Client.transporter) {
+  oAuth2Client.transporter.defaults.fetchImplementation = fetch;
+}
 
 // Graceful handling of unhandled errors.
 unhandled();
@@ -54,42 +74,55 @@ if (electronIsDev) {
 (async () => {
   // Wait for electron app to be ready.
   app.whenReady().then(() => {
-  // Security - Set Content-Security-Policy based on whether or not we are in dev mode.
-  setupContentSecurityPolicy(myCapacitorApp.getCustomURLScheme());
+    // Security - Set Content-Security-Policy based on whether or not we are in dev mode.
+    setupContentSecurityPolicy(myCapacitorApp.getCustomURLScheme());
 
-  // Initialize our app, build windows, and load content.
-  myCapacitorApp.init();
+    // Initialize our app, build windows, and load content.
+    myCapacitorApp.init();
 
-  // ... existing capacitor window creation ...
+    // ... existing capacitor window creation ...
 
-  ipcMain.handle('electron-google-login', async () => {
-    return new Promise((resolve, reject) => {
-      const authWindow = new BrowserWindow({ width: 500, height: 600 });
-      const authUrl = oAuth2Client.generateAuthUrl({
-        access_type: 'offline',
-        scope: ['https://mail.google.com/']
-      });
+    ipcMain.handle('electron-google-login', async () => {
+      return new Promise((resolve, reject) => {
+        const authWindow = new BrowserWindow({ width: 500, height: 600 });
+        let settled = false;
 
-      authWindow.loadURL(authUrl);
-
-      authWindow.webContents.on('will-redirect', async (event, url) => {
-        const parsedUrl = new URL(url);
-        if (parsedUrl.origin === 'http://localhost' && parsedUrl.pathname === '/callback') {
-          authWindow.close();
-          const code = parsedUrl.searchParams.get('code');
-          try {
-            const { tokens } = await oAuth2Client.getToken(code);
-            resolve(tokens.access_token);
-          } catch (err) {
-            reject(err);
+        authWindow.on('closed', () => {
+          if (!settled) {
+            settled = true;
+            reject(new Error('User closed the login window'));
           }
-        }
+        });
+
+        const authUrl = oAuth2Client.generateAuthUrl({
+          access_type: 'offline',
+          scope: ['https://mail.google.com/']
+        });
+
+        authWindow.loadURL(authUrl);
+
+        authWindow.webContents.on('will-redirect', async (_event, url) => {
+          const parsedUrl = new URL(url);
+          if (parsedUrl.origin === 'http://localhost' && parsedUrl.pathname === '/callback') {
+            settled = true;
+            authWindow.close();
+            const code = parsedUrl.searchParams.get('code');
+            try {
+              const { tokens } = await oAuth2Client.getToken(code!);
+              resolve(tokens.access_token);
+            } catch (err) {
+              reject(err);
+            }
+          }
+        });
       });
     });
   });
-});
+
   // Check for updates if we are in a packaged app.
-  autoUpdater.checkForUpdatesAndNotify();
+  autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+    console.warn('Auto-update check skipped/failed:', err?.message || err);
+  });
 })();
 
 // Handle when all of our windows are close (platforms have their own expectations).

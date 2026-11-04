@@ -37,10 +37,10 @@ dist-tsc/
 # =========================
 # 5. ELECTRON BUILD OUTPUT
 # =========================
-electron/app/
-electron/dist/
-electron/out/
-electron/build/
+mailbroom-app/electron/app/
+mailbroom-app/electron/dist/
+mailbroom-app/electron/out/
+mailbroom-app/electron/build/
 
 # =========================
 # 6. SYSTEM & EDITOR FILES
