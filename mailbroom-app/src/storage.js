@@ -45,3 +45,18 @@ export async function removeUnsubscribedEmail(email) {
         value: JSON.stringify(saved)
     });
 }
+
+export async function saveKeptEmail(email) {
+    const { value } = await Preferences.get({ key: 'keptEmails' });
+    const saved = JSON.parse(value || '[]');
+    if (!saved.includes(email)) {
+        saved.push(email);
+        await Preferences.set({ key: 'keptEmails', value: JSON.stringify(saved) });
+    }
+}
+
+export async function isAlreadyKept(email) {
+    const { value } = await Preferences.get({ key: 'keptEmails' });
+    const saved = JSON.parse(value || '[]');
+    return saved.includes(email);
+}

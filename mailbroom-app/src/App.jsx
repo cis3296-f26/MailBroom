@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { isAlreadyUnsubscribed, saveUnsubscribedEmail } from './storage';
+import { isAlreadyUnsubscribed, saveUnsubscribedEmail, isAlreadyKept, 
+    saveKeptEmail  } from './storage';
 import './App.css';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -123,7 +124,8 @@ export default function App() {
       const filtered = [];
       for (const s of ranked) {
           const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
-          if (!(await isAlreadyUnsubscribed(cleanEmail))) {
+          if (!(await isAlreadyUnsubscribed(cleanEmail)) && !(await isAlreadyKept(cleanEmail))) 
+            {
              filtered.push(s);
           }
       }
@@ -158,9 +160,16 @@ setSenders(filtered);
     }
   };
 
-    const handleDecision = (sender, action) => {
-    if (action === 'unsubscribe') handleUnsubscribe(sender);
-    else setStatus(`Kept ${sender.from}`);
+    const handleDecision = async (sender, action) => {
+    const cleanEmail = sender.from.match(/<([^>]+)>/)?.[1] || sender.from;
+    
+      
+    if (action === 'unsubscribe'){
+       handleUnsubscribe(sender);
+    } else {
+        await saveKeptEmail(cleanEmail); 
+        setStatus(`Kept ${sender.from}`);
+    }
   };
 
   return (
