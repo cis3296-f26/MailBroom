@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { isAlreadyUnsubscribed, saveUnsubscribedEmail, isAlreadyKept, 
-    saveKeptEmail  } from './storage';
+import { useState, useRef } from 'react';
+import { isAlreadyUnsubscribed, saveUnsubscribedEmail, isAlreadyKept, saveKeptEmail, removeUnsubscribedEmail } from './storage';
 import './App.css';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
+const UNDO_MS = 6000; //time for the user to undo an unsubscribe action
 
 function parseUnsubscribe(listUnsub = '', listUnsubPost = '') {
   const links = [...listUnsub.matchAll(/<([^>]+)>/g)].map((m) => m[1]);
@@ -67,6 +67,8 @@ export default function App() {
   const [senders, setSenders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
+  const timers = useRef({});
+  const [pending, setPending] = useState([]);
 
   const handleLogin = async () => {
     try {
@@ -159,17 +161,41 @@ setSenders(filtered);
       setStatus('Unsubscribe failed. Check the console.');
     }
   };
+    const scheduleUnsubscribe = async (s) => {
 
-    const handleDecision = async (sender, action) => {
+    const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+    await saveUnsubscribedEmail(cleanEmail);
+    
+    setPending((p) => [...p, s]);
+    timers.current[s.from] = setTimeout(() => {
+      delete timers.current[s.from];
+      setPending((p) => p.filter((x) => x.from !== s.from));
+      handleUnsubscribe(s); // the real request happens here
+    }, UNDO_MS);
+  };
+
+  const undoUnsubscribe = async (s) => {
+    clearTimeout(timers.current[s.from]);
+    delete timers.current[s.from];
+    setPending((p) => p.filter((x) => x.from !== s.from));
+    
+    // REMOVE FROM YOUR MEMORY
+    const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+    await removeUnsubscribedEmail(cleanEmail);
+
+    setStatus(`Cancelled unsubscribe for ${s.from}`);
+  };
+
+  const handleDecision = async (sender, action) => {
     const cleanEmail = sender.from.match(/<([^>]+)>/)?.[1] || sender.from;
     
-      
-    if (action === 'unsubscribe'){
-       handleUnsubscribe(sender);
+    if (action === 'unsubscribe') {
+      scheduleUnsubscribe(sender); // This starts her timer
     } else {
-        await saveKeptEmail(cleanEmail); 
-        setStatus(`Kept ${sender.from}`);
+      await saveKeptEmail(cleanEmail); 
+      setStatus(`Kept ${sender.from}`);
     }
+  
   };
 
   return (
@@ -184,7 +210,17 @@ setSenders(filtered);
         <div>
           {loading && <p>Loading your emails...</p>}
           {status && <p>{status}</p>}
-                    {!loading && senders.length > 0 && (
+            
+          <div className="undo-container">
+            {pending.map((s) => (
+              <div key={s.from} className="undo-bar">
+                Unsubscribing from {s.from}...{' '}
+                <button onClick={() => undoUnsubscribe(s)}>Undo</button>
+              </div>
+            ))}
+          </div>
+          
+          {!loading && senders.length > 0 && (
             <SenderCard senders={senders} onDecision={handleDecision} />
           )}
 
