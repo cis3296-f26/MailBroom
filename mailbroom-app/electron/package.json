@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/cis3296-f26/MailBroom.git"
   },
   "license": "MIT",
   "main": "build/src/index.js",

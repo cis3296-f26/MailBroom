@@ -1,6 +1,13 @@
 {
   "appId": "com.nathan.mailbroom",
   "productName": "MailBroom",
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "cis3296-f26",
+      "repo": "MailBroom"
+    }
+  ],
   "directories": {
     "output": "out",
     "buildResources": "resources"
