@@ -1,7 +1,17 @@
-import { useState, useRef } from 'react';
-import { isAlreadyUnsubscribed, saveUnsubscribedEmail, isAlreadyKept, saveKeptEmail, removeUnsubscribedEmail } from './storage';
+
+import { useRef, useState } from 'react';
 import './App.css';
+import { getSenderIdentity } from './senderIdentity';
+import { getGmail, getMessageDetails } from './gmail';
+import {
+  isAlreadyUnsubscribed,
+  saveUnsubscribedEmail,
+  isAlreadyKept,
+  saveKeptEmail,
+  removeUnsubscribedEmail,
+} from './storage';
 import RefreshLogo from '@components/RefreshLogo';
+
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const UNDO_MS = 6000; //time for the user to undo an unsubscribe action
@@ -30,6 +40,22 @@ async function sendMailto(token, mailto) {
   return res.ok;
 }
 
+function SenderAvatar({ identity }) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div className="sender-avatar" aria-hidden="true">
+      {identity.iconUrl && !failed ? (
+        <img
+          src={identity.iconUrl}
+          alt=""
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+        />
+      ) : identity.initials}
+    </div>
+  );
+}
 //px of horizontal drag  
 const THRESHOLD = 110;   
 
@@ -91,11 +117,13 @@ function SenderCard({ senders, onDecision }) {
     return <p className="card-done">All done. Reviewed {i} senders.</p>;
   }
 
+  const identity = getSenderIdentity(sender.from);
+
   return (
     <>
       <div className="card-progress">{i} of {senders.length} reviewed</div>
 
-      {/* key gives each sender a fresh node, so the flown-out styles don't carry over */}
+      {/* Reset swipe styles when the sender changes */}
       <div
         key={sender.from}
         ref={card}
@@ -107,11 +135,32 @@ function SenderCard({ senders, onDecision }) {
         <div className="verdict verdict-no">UNSUBSCRIBE</div>
         <div className="verdict verdict-yes">KEEP</div>
 
-        <div className="card-from">{sender.from}</div>
+        <div className="sender-heading">
+          <SenderAvatar key={sender.from} identity={identity} />
+          <div className="sender-details">
+            <div className="card-from">{identity.name}</div>
+            {identity.name !== identity.email && (
+              <div className="sender-email">{identity.email}</div>
+            )}
+          </div>
+        </div>
         <div className="card-stats">
           {sender.count} message{sender.count === 1 ? '' : 's'} · {sender.opened} opened
         </div>
         {sender.opened === 0 && <div className="card-never">never opened</div>}
+        {sender.latest && (
+          <div className="email-preview">
+            <div className="preview-label">Latest email</div>
+            <div className="preview-date">
+              {new Date(sender.latest.timestamp).toLocaleString(undefined, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })}
+            </div>
+            <div className="preview-subject">{sender.latest.subject}</div>
+            <p className="preview-snippet">{sender.latest.snippet}</p>
+          </div>
+        )}
       </div>
 
       <div className="card-buttons">
@@ -129,58 +178,95 @@ export default function App() {
   const [senders, setSenders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [loadProgress, setLoadProgress] = useState('');
+  const loadInFlight = useRef(false);
+  const loginInFlight = useRef(false);
   const timers = useRef({});
   const [pending, setPending] = useState([]);
 
   const handleLogin = async () => {
+    if (loginInFlight.current) return;
+    loginInFlight.current = true;
+    setLoading(true);
     try {
       const accessToken = await window.desktopAPI.loginWithGoogle();
       setToken(accessToken);
-      loadSenders(accessToken);
+      await loadSenders(accessToken);
     } catch (error) {
       console.error('Login failed:', error);
+    } finally {
+      loginInFlight.current = false;
+      setLoading(false);
     }
   };
   const loadSenders = async (accessToken) => {
+    if (loadInFlight.current) return;
+    loadInFlight.current = true;
     setLoading(true);
     setStatus('');
+    setLoadError('');
+    setLoadProgress('Loading your emails...');
     try {
-      const headers = { Authorization: `Bearer ${accessToken}` };
+      const onRetry = (seconds) => setLoadProgress(`Gmail is busy. Retrying in ${seconds}s...`);
       const q = encodeURIComponent('category:promotions OR unsubscribe');
-      const listRes = await fetch(`${GMAIL}/messages?maxResults=50&labelIds=INBOX&q=${q}`, { headers });
-      const listData = await listRes.json();
-      console.log('LIST', listRes.status, listData);
-      if (!listRes.ok) throw new Error(JSON.stringify(listData));
+      const listData = await getGmail(
+        `/messages?maxResults=50&labelIds=INBOX&q=${q}`,
+        accessToken,
+        { onRetry }
+      );
       const { messages = [] } = listData;
 
-      const details = await Promise.all(
-        messages.map((m) =>
-          fetch(
-            `${GMAIL}/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post`,
-            { headers }
-          ).then((r) => r.json())
-        )
-      );
-      console.log('DETAILS', details.length, details[0]?.payload?.headers);
+      const details = await getMessageDetails(messages, accessToken, {
+        onRetry,
+        onProgress: (done, total) => setLoadProgress(`Loading emails: ${done} of ${total}...`),
+      });
 
       const bySender = {};
+
       for (const msg of details) {
-        const h = Object.fromEntries((msg.payload?.headers || []).map((x) => [x.name.toLowerCase(), x.value]));
-        if (!h['list-unsubscribe']) continue; // skip senders with no unsubscribe option
-        const from = h['from'];
+        const h = Object.fromEntries(
+          (msg.payload?.headers || []).map((x) => [
+            x.name.toLowerCase(),
+            x.value,
+          ])
+        );
+
+        if (!h['list-unsubscribe'] || !h.from) continue;
+
+        const from = h.from;
+
         if (!bySender[from]) {
-                    bySender[from] = {
+          bySender[from] = {
             from,
             count: 0,
             unread: 0,
-            ...parseUnsubscribe(h['list-unsubscribe'], h['list-unsubscribe-post']),
+            latest: null,
+            ...parseUnsubscribe(
+              h['list-unsubscribe'],
+              h['list-unsubscribe-post']
+            ),
           };
-          
         }
-        bySender[from].count++;
-        if ((msg.labelIds || []).includes('UNREAD')) bySender[from].unread++;
+
+        const sender = bySender[from];
+        sender.count++;
+
+        if ((msg.labelIds || []).includes('UNREAD')) {
+          sender.unread++;
+        }
+
+        const timestamp = Number(msg.internalDate);
+
+        if (!sender.latest || timestamp > sender.latest.timestamp) {
+          sender.latest = {
+            timestamp,
+            subject: h.subject || '(No subject)',
+            snippet: msg.snippet || 'No preview available.',
+          };
+        }
       }
-            const ranked = Object.values(bySender)
+      const ranked = Object.values(bySender)
         .map((s) => ({ ...s, opened: s.count - s.unread }))
         .sort((a, b) => b.count - a.count);
 
@@ -196,9 +282,12 @@ export default function App() {
 setSenders(filtered);
     } catch (err) {
       console.error('Failed to load emails:', err);
-      setStatus('Failed to load emails. Check the console.');
+      setLoadError(err.message || 'Failed to load emails. Please try again.');
+    } finally {
+      loadInFlight.current = false;
+      setLoading(false);
+      setLoadProgress('');
     }
-    setLoading(false);
   };
 
   const handleUnsubscribe = async (s) => {
@@ -270,12 +359,19 @@ setSenders(filtered);
         </div>
 
       {!token ? (
-        <button onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
-          Login with Google
+        <button disabled={loading} onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
+          {loading ? 'Signing in...' : 'Login with Google'}
         </button>
       ) : (
         <div>
-          {loading && <p>Loading your emails...</p>}
+          {loading && <p role="status">{loadProgress || 'Loading your emails...'}</p>}
+          {loadError && !loading && (
+            <div role="alert">
+              <p>{loadError}</p>
+              <button onClick={() => loadSenders(token)}>Retry loading emails</button>
+              <button onClick={handleLogin}>Sign in again</button>
+            </div>
+          )}
           {status && <p>{status}</p>}
             
           <div className="undo-container">
@@ -297,7 +393,7 @@ setSenders(filtered);
             </div>
           )}
 
-          {!loading && senders.length === 0 && (
+          {!loading && !loadError && senders.length === 0 && (
             <p>No senders with an unsubscribe option in your 50 most recent emails.</p>
           )}
         </div>
