@@ -122,11 +122,12 @@ export default function App() {
         //filters the email you already unsubscribed from
       const filtered = [];
       for (const s of ranked) {
-        if (!(await isAlreadyUnsubscribed(s.from))){
-          filtered.push(s);
-        }
+          const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+          if (!(await isAlreadyUnsubscribed(cleanEmail))) {
+             filtered.push(s);
+          }
       }
-        setSenders(ranked);
+setSenders(filtered);
     } catch (err) {
       console.error('Failed to load emails:', err);
       setStatus('Failed to load emails. Check the console.');
@@ -137,7 +138,8 @@ export default function App() {
 
   const handleUnsubscribe = async (s) => {
     try {
-      await saveUnsubscribedEmail(s.form); //save to mem when they click unsubscribed
+      const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+      await saveUnsubscribedEmail(cleanEmail); //save to mem when they click unsubscribed
       
       if (s.https) {
         if (window.desktopAPI?.unsubscribe) {
