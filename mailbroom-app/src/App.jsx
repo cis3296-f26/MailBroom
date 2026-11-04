@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import './App.css';
+import RefreshLogo from '@components/RefreshLogo';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const UNDO_MS = 6000; //time for the user to undo an unsubscribe action
@@ -127,7 +128,6 @@ export default function App() {
     }
     setLoading(false);
   };
-  
 
   const handleUnsubscribe = async (s) => {
     try {
@@ -170,7 +170,11 @@ export default function App() {
 
   return (
     <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif' }}>
-      <h1>MailBroom</h1>
+      <div style={{display: 'flex', flexDirection: 'row', justifyContent:'center'}}>
+        <h1>MailBroom</h1>
+        {token ? (<RefreshLogo size={60} onRefresh={() => loadSenders(token)} />) : null}
+      </div>
+
 
       {!token ? (
         <button onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
