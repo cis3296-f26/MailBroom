@@ -53,4 +53,5 @@ Thumbs.db
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?mailbroom-app/credentials.json
+*.sw?
+mailbroom-app/credentials.json
