@@ -1,0 +1,45 @@
+{
+  "appId": "com.nathan.mailbroom",
+  "productName": "MailBroom",
+  "directories": {
+    "output": "out",
+    "buildResources": "resources"
+  },
+  "files": [
+    "assets/**/*",
+    "build/**/*",
+    "capacitor.config.*",
+    "app/**/*",
+    "credentials.json"
+  ],
+  "asarUnpack": [
+    "**/node-fetch/**",
+    "**/gaxios/**",
+    "**/google-auth-library/**",
+    "**/fetch-blob/**",
+    "**/formdata-polyfill/**",
+    "**/data-uri-to-buffer/**"
+  ],
+  "nsis": {
+    "allowElevation": true,
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  },
+  "portable": {
+    "artifactName": "${productName}-Portable-${version}.${ext}"
+  },
+  "win": {
+    "target": ["nsis", "portable"],
+    "icon": "assets/appIcon.ico"
+  },
+  "mac": {
+    "target": ["dmg", "zip"],
+    "category": "public.app-category.utilities",
+    "icon": "assets/appIcon.png"
+  },
+  "linux": {
+    "target": ["AppImage"],
+    "category": "Utility",
+    "icon": "assets/appIcon.png"
+  }
+}
