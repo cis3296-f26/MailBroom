@@ -12,7 +12,9 @@
     "electron:sync": "npm run build && npx cap copy @capacitor-community/electron && node -e \"require('fs').copyFileSync('credentials.json', 'electron/credentials.json')\"",
     "electron:pack": "npm run electron:sync && npm --prefix electron run electron:pack",
     "electron:build": "npm run electron:sync && npm --prefix electron run electron:make",
-    "electron:portable": "npm run electron:sync && npm --prefix electron run electron:portable"
+    "electron:portableWin": "npm run electron:sync && npm --prefix electron run electron:portableWin",
+    "electron:portableLinux": "npm run electron:sync && npm --prefix electron run electron:portableLinux",
+    "electron:portableMac": "npm run electron:sync && npm --prefix electron run electron:portableMac"
   },
   "dependencies": {
     "@capacitor-community/electron": "^5.0.1",
