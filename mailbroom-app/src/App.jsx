@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import './App.css';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
+const UNDO_MS = 6000; //time for the user to undo an unsubscribe action
 
 function parseUnsubscribe(listUnsub = '', listUnsubPost = '') {
   const links = [...listUnsub.matchAll(/<([^>]+)>/g)].map((m) => m[1]);
@@ -126,6 +127,8 @@ export default function App() {
   const [senders, setSenders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
+  const timers = useRef({});
+  const [pending, setPending] = useState([]);
 
   const handleLogin = async () => {
     try {
@@ -208,9 +211,24 @@ export default function App() {
       setFailed((f) => [...f, s.from]);
     }
   };
+    const scheduleUnsubscribe = (s) => {
+    setPending((p) => [...p, s]);
+    timers.current[s.from] = setTimeout(() => {
+      delete timers.current[s.from];
+      setPending((p) => p.filter((x) => x.from !== s.from));
+      handleUnsubscribe(s); // the real request happens here
+    }, UNDO_MS);
+  };
 
-    const handleDecision = (sender, action) => {
-    if (action === 'unsubscribe') handleUnsubscribe(sender);
+  const undoUnsubscribe = (s) => {
+    clearTimeout(timers.current[s.from]);
+    delete timers.current[s.from];
+    setPending((p) => p.filter((x) => x.from !== s.from));
+    setStatus(`Cancelled unsubscribe for ${s.from}`);
+  };
+
+  const handleDecision = (sender, action) => {
+    if (action === 'unsubscribe') scheduleUnsubscribe(sender);
     else setStatus(`Kept ${sender.from}`);
   };
 
@@ -226,7 +244,17 @@ export default function App() {
         <div>
           {loading && <p>Loading your emails...</p>}
           {status && <p>{status}</p>}
-                    {!loading && senders.length > 0 && (
+            
+          <div className="undo-container">
+            {pending.map((s) => (
+              <div key={s.from} className="undo-bar">
+                Unsubscribing from {s.from}...{' '}
+                <button onClick={() => undoUnsubscribe(s)}>Undo</button>
+              </div>
+            ))}
+          </div>
+          
+          {!loading && senders.length > 0 && (
             <SenderCard senders={senders} onDecision={handleDecision} />
           )}
                     {failed.length > 0 && (
