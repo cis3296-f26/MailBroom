@@ -1,56 +1,77 @@
-const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
+const GMAIL_BASE_URL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+class GmailService {
+  #token = null;
 
-// Only retry reads: unsubscribe/send operations must not be repeated here.
-export async function getGmail(path, token, {
-  onRetry = () => {},
-  fetchImpl = fetch,
-  sleep = wait,
-} = {}) {
-  for (let attempt = 0; ; attempt++) {
-    const res = await fetchImpl(`${GMAIL}${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
+  // 1. AUTHENTICATION
+  async authenticate() {
+    if (!window.desktopAPI) throw new Error("Desktop API not available");
+    this.#token = await window.desktopAPI.loginWithGoogle();
+    return this.#token;
+  }
+
+  get isAuthenticated() {
+    return !!this.#token;
+  }
+
+  async #request(path, options = {}) {
+    if (!this.#token) throw new Error("Not authenticated with Gmail");
+
+    const { onRetry = () => {}, fetchImpl = fetch, sleep = wait, method = 'GET', body } = options;
+
+    for (let attempt = 0; ; attempt++) {
+      const headers = { Authorization: `Bearer ${this.#token}` };
+      if (body) headers['Content-Type'] = 'application/json';
+
+      const res = await fetchImpl(`${GMAIL_BASE_URL}${path}`, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined
+      });
+      
+      const data = await res.json();
+      if (res.ok) return data;
+
+      const reasons = data.error?.errors?.map((error) => error.reason) || [];
+      const rateLimited = res.status === 429 || (res.status === 403 && reasons.includes('rateLimitExceeded'));
+      if (!rateLimited || attempt >= 4) throw new Error(`Gmail API Error: ${res.status}`);
+      
+      const delay = 1000 * 2 ** attempt; 
+      onRetry(Math.ceil(delay / 1000));
+      await sleep(delay);
+    }
+  }
+
+  // 3. SPECIFIC API ACTIONS
+  async fetchPromotions(query, onRetry) {
+    const q = encodeURIComponent(query);
+    return this.#request(`/messages?maxResults=50&labelIds=INBOX&q=${q}`, { onRetry });
+  }
+
+  async fetchMessageDetails(messages, { onRetry, onProgress }) {
+    const details = [];
+    for (const message of messages) {
+      onProgress(details.length, messages.length);
+      details.push(
+        await this.#request(`/messages/${message.id}?format=full&fields=id,labelIds,internalDate,snippet,payload/headers`, { onRetry })
+      );
+    }
+    return details;
+  }
+
+  async sendUnsubscribeEmail(mailtoUrl) {
+    const url = new URL(mailtoUrl);
+    const clean = (s) => s.replace(/[\r\n]/g, ''); 
+    const to = clean(decodeURIComponent(url.pathname));
+    const subject = clean(url.searchParams.get('subject') || 'unsubscribe');
+    const raw = `To: ${to}\r\nSubject: ${subject}\r\n\r\nunsubscribe`;
+    const encoded = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    
+    return this.#request('/messages/send', { 
+      method: 'POST', 
+      body: { raw: encoded } 
     });
-    const data = await res.json();
-    if (res.ok) return data;
-
-    const reasons = data.error?.errors?.map((error) => error.reason) || [];
-    const rateLimited = res.status === 429 || (res.status === 403 &&
-      reasons.some((reason) => ['rateLimitExceeded', 'userRateLimitExceeded'].includes(reason)));
-    const retryable = rateLimited || res.status >= 500;
-    const message = rateLimited
-      ? 'Gmail is limiting requests. Please wait a little, then retry.'
-      : res.status === 401
-        ? 'Your Google session expired. Please sign in again.'
-        : `Gmail could not load emails (${res.status}). Please try again.`;
-
-    if (!retryable || attempt >= 4) throw new Error(message);
-
-    const retryAfter = res.headers.get('Retry-After');
-    const retryMs = retryAfter === null ? 0 : /^\d+(\.\d+)?$/.test(retryAfter)
-      ? Number(retryAfter) * 1000
-      : Math.max(0, Date.parse(retryAfter) - Date.now()) || 0;
-    const delay = Math.max(1000 * 2 ** attempt + Math.random() * 500, retryMs);
-    // A long server cooldown should return control to the user, not freeze loading.
-    if (delay > 60000) throw new Error(message);
-    onRetry(Math.ceil(delay / 1000));
-    await sleep(delay);
   }
 }
 
-export async function getMessageDetails(messages, token, {
-  onProgress = () => {},
-  ...options
-} = {}) {
-  const details = [];
-  // Avoid the per-user concurrency limit by fetching one email at a time.
-  for (const message of messages) {
-    onProgress(details.length, messages.length);
-    details.push(await getGmail(
-      `/messages/${message.id}?format=full&fields=id,labelIds,internalDate,snippet,payload/headers`,
-      token,
-      options
-    ));
-  }
-  return details;
-}
+export const gmailApi = new GmailService();

@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import './App.css';
 import { getSenderIdentity } from './senderIdentity';
-import { getGmail, getMessageDetails } from './gmail';
+import { gmailApi } from './gmail.js';
 import {
   isAlreadyUnsubscribed,
   saveUnsubscribedEmail,
@@ -11,34 +11,6 @@ import {
   removeUnsubscribedEmail,
 } from './storage';
 import RefreshLogo from '@components/RefreshLogo';
-
-
-const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
-const UNDO_MS = 6000; //time for the user to undo an unsubscribe action
-
-function parseUnsubscribe(listUnsub = '', listUnsubPost = '') {
-  const links = [...listUnsub.matchAll(/<([^>]+)>/g)].map((m) => m[1]);
-  return {
-    https: links.find((l) => l.startsWith('https://')),
-    mailto: links.find((l) => l.startsWith('mailto:')),
-    oneClick: /One-Click/i.test(listUnsubPost),
-  };
-}
-
-async function sendMailto(token, mailto) {
-  const url = new URL(mailto);
-  const clean = (s) => s.replace(/[\r\n]/g, ''); // header values come from the sender, so strip newlines
-  const to = clean(decodeURIComponent(url.pathname));
-  const subject = clean(url.searchParams.get('subject') || 'unsubscribe');
-  const raw = `To: ${to}\r\nSubject: ${subject}\r\n\r\nunsubscribe`;
-  const encoded = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const res = await fetch(`${GMAIL}/messages/send`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw: encoded }),
-  });
-  return res.ok;
-}
 
 function SenderAvatar({ identity }) {
   const [failed, setFailed] = useState(false);
@@ -173,7 +145,7 @@ function SenderCard({ senders, onDecision }) {
 
 
 export default function App() {
-  const [token, setToken] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [failed, setFailed] = useState([]);
   const [senders, setSenders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -190,9 +162,9 @@ export default function App() {
     loginInFlight.current = true;
     setLoading(true);
     try {
-      const accessToken = await window.desktopAPI.loginWithGoogle();
-      setToken(accessToken);
-      await loadSenders(accessToken);
+      await gmailApi.authenticate();
+      setIsAuthenticated(true);
+      await loadSenders();
     } catch (error) {
       console.error('Login failed:', error);
     } finally {
@@ -200,7 +172,7 @@ export default function App() {
       setLoading(false);
     }
   };
-  const loadSenders = async (accessToken) => {
+  const loadSenders = async () => {
     if (loadInFlight.current) return;
     loadInFlight.current = true;
     setLoading(true);
@@ -210,14 +182,8 @@ export default function App() {
     try {
       const onRetry = (seconds) => setLoadProgress(`Gmail is busy. Retrying in ${seconds}s...`);
       const q = encodeURIComponent('category:promotions OR unsubscribe');
-      const listData = await getGmail(
-        `/messages?maxResults=50&labelIds=INBOX&q=${q}`,
-        accessToken,
-        { onRetry }
-      );
-      const { messages = [] } = listData;
-
-      const details = await getMessageDetails(messages, accessToken, {
+      const listData = await gmailApi.fetchPromotions('category:promotions OR unsubscribe', onRetry);
+      const details = await gmailApi.fetchMessageDetails(listData.messages || [], {
         onRetry,
         onProgress: (done, total) => setLoadProgress(`Loading emails: ${done} of ${total}...`),
       });
@@ -279,7 +245,7 @@ export default function App() {
              filtered.push(s);
           }
       }
-setSenders(filtered);
+      setSenders(filtered);
     } catch (err) {
       console.error('Failed to load emails:', err);
       setLoadError(err.message || 'Failed to load emails. Please try again.');
@@ -298,15 +264,15 @@ setSenders(filtered);
       if (s.https) {
         if (window.desktopAPI?.unsubscribe) {
           const result = await window.desktopAPI.unsubscribe({ url: s.https, oneClick: s.oneClick });
-          setStatus(result.ok ? `Unsubscribe sent for ${s.from}` : `Failed: ${result.error || result.status}`);
-          if (!result.ok) setFailed((f) => [...f, s.from]);
+
+          if (!result.ok) throw new Error(result.error || `HTTPS Unsubscribe Failed: ${result.status}`);
+          setStatus(`Unsubscribe email sent to ${s.from}`);
         } else {
           window.open(s.https, '_blank');
         }
       } else if (s.mailto) {
-        const ok = await sendMailto(token, s.mailto);
-        setStatus(ok ? `Unsubscribe email sent to ${s.from}` : 'Failed to send unsubscribe email');
-        if (!ok) setFailed((f) => [...f, s.from]);
+        const ok = await gmailApi.sendUnsubscribeEmail(s.mailto);
+        setStatus(`Unsubscribe email sent to ${s.from}`);
       }
     } catch (err) {
       console.error(err);
