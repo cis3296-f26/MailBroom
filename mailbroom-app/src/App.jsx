@@ -12,6 +12,15 @@ import {
 } from './storage';
 import RefreshLogo from '@components/RefreshLogo';
 
+function parseUnsubscribe(listUnsub = '', listUnsubPost = '') {
+  const links = [...listUnsub.matchAll(/<([^>]+)>/g)].map((m) => m[1]);
+  return {
+    https: links.find((l) => l.startsWith('https://')),
+    mailto: links.find((l) => l.startsWith('mailto:')),
+    oneClick: /One-Click/i.test(listUnsubPost),
+  };
+}
+
 function SenderAvatar({ identity }) {
   const [failed, setFailed] = useState(false);
 
@@ -326,10 +335,10 @@ export default function App() {
       <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif', overflowX: 'hidden' }}>
         <div style={{display: 'flex', flexDirection: 'row', justifyContent:'center'}}>
           <h1>MailBroom</h1>
-          {token ? (<RefreshLogo size={60} onRefresh={() => loadSenders(token)} />) : null}
+          {isAuthenticated ? (<RefreshLogo size={60} onRefresh={() => loadSenders(isAuthenticated)} />) : null}
         </div>
 
-      {!token ? (
+      {!isAuthenticated ? (
         <button disabled={loading} onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
           {loading ? 'Signing in...' : 'Login with Google'}
         </button>
@@ -339,7 +348,7 @@ export default function App() {
           {loadError && !loading && (
             <div role="alert">
               <p>{loadError}</p>
-              <button onClick={() => loadSenders(token)}>Retry loading emails</button>
+              <button onClick={() => loadSenders(isAuthenticated)}>Retry loading emails</button>
               <button onClick={handleLogin}>Sign in again</button>
             </div>
           )}
