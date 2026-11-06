@@ -249,6 +249,11 @@ export default function App() {
     } catch (err) {
       console.error('Failed to load emails:', err);
       setLoadError(err.message || 'Failed to load emails. Please try again.');
+
+      if (err.message.includes('session expired') || err.message.includes('401')) {
+        setIsAuthenticated(false); //Reset back to login
+        setStatus('Session expired. Please log in again.');
+      }
     } finally {
       loadInFlight.current = false;
       setLoading(false);
