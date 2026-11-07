@@ -1,3 +1,11 @@
+import {
+  isAlreadyUnsubscribed,
+  isAlreadyKept,
+  saveUnsubscribedEmail,
+  removeUnsubscribedEmail,
+  saveKeptEmail,
+} from './storage.js';
+
 const GMAIL_BASE_URL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 const wait = (ms, signal) =>
@@ -16,18 +24,33 @@ const wait = (ms, signal) =>
     );
   });
 
+// Extracts the clean email address from a "Name <email@domain.com>" string
+function cleanSenderEmail(from = '') {
+  return from.match(/<([^>]+)>/)?.[1] || from;
+}
+
+// Parses List-Unsubscribe and List-Unsubscribe-Post headers
+function parseUnsubscribe(listUnsub = '', listUnsubPost = '') {
+  const links = [...listUnsub.matchAll(/<([^>]+)>/g)].map((m) => m[1]);
+  return {
+    https: links.find((l) => l.startsWith('https://')),
+    mailto: links.find((l) => l.startsWith('mailto:')),
+    oneClick: /One-Click/i.test(listUnsubPost),
+  };
+}
+
 class GmailService {
   #token = null;
   #controller = null;
 
-  //Cancels previous requests, initializes abortController
+  // Cancels previous requests, initializes abortController
   beginLoading() {
     this.cancelActiveRequests();
     this.#controller = new AbortController();
     return this.#controller.signal;
   }
 
-  //Stops active HTTP requests
+  // Stops active HTTP requests
   cancelActiveRequests() {
     if (this.#controller) {
       this.#controller.abort();
@@ -53,7 +76,7 @@ class GmailService {
     return err?.name === 'AbortError' || (this.#controller ? this.#controller.signal.aborted : false);
   }
 
-  //AUTHENTICATION
+  // AUTHENTICATION
   async authenticate(interactive = true) {
     if (!window.desktopAPI) throw new Error("Desktop API not available");
 
@@ -84,7 +107,7 @@ class GmailService {
     return !!this.#token;
   }
 
-  //Private method to make requests to Gmail API with retry logic for rate limiting and token refresh
+  // Private method to make requests to Gmail API with retry logic for rate limiting and token refresh
   async #request(path, options = {}) {
     if (!this.#token) throw new Error("Not authenticated with Gmail");
 
@@ -147,7 +170,7 @@ class GmailService {
     }
   }
 
-  // Fetches a list of targetted messages from the user's inbox based on a search query
+  // Fetches a list of targeted messages from the user's inbox based on a search query
   async fetchPromotions(query, onRetry) {
     const q = encodeURIComponent(query);
     return this.#request(`/messages?maxResults=50&labelIds=INBOX&q=${q}`, { onRetry });
@@ -180,6 +203,82 @@ class GmailService {
     return details;
   }
 
+  // Loads and aggregates senders from promotion/newsletter emails, filtering already handled senders
+  async loadSenders({ onRetry, onProgress, query = 'category:promotions OR unsubscribe' } = {}) {
+    this.beginLoading();
+
+    const listData = await this.fetchPromotions(query, onRetry);
+    const messages = listData?.messages || [];
+
+    const details = await this.fetchMessageDetails(messages, {
+      onRetry,
+      onProgress,
+    });
+
+    const bySender = {};
+
+    for (const msg of details) {
+      const h = Object.fromEntries(
+        (msg.payload?.headers || []).map((x) => [
+          x.name.toLowerCase(),
+          x.value,
+        ])
+      );
+
+      if (!h['list-unsubscribe'] || !h.from) continue;
+
+      const from = h.from;
+
+      if (!bySender[from]) {
+        bySender[from] = {
+          from,
+          count: 0,
+          unread: 0,
+          latest: null,
+          ...parseUnsubscribe(
+            h['list-unsubscribe'],
+            h['list-unsubscribe-post']
+          ),
+        };
+      }
+
+      const sender = bySender[from];
+      sender.count++;
+
+      if ((msg.labelIds || []).includes('UNREAD')) {
+        sender.unread++;
+      }
+
+      const timestamp = Number(msg.internalDate);
+
+      if (!sender.latest || timestamp > sender.latest.timestamp) {
+        sender.latest = {
+          timestamp,
+          subject: h.subject || '(No subject)',
+          snippet: msg.snippet || 'No preview available.',
+        };
+      }
+    }
+
+    if (!this.isActive) return [];
+
+    const ranked = Object.values(bySender)
+      .map((s) => ({ ...s, opened: s.count - s.unread }))
+      .sort((a, b) => b.count - a.count);
+
+    // Filter out senders that have already been unsubscribed or kept
+    const filtered = [];
+    for (const s of ranked) {
+      if (!this.isActive) return [];
+      const cleanEmail = cleanSenderEmail(s.from);
+      if (!(await isAlreadyUnsubscribed(cleanEmail)) && !(await isAlreadyKept(cleanEmail))) {
+        filtered.push(s);
+      }
+    }
+
+    return filtered;
+  }
+
   // Sends an unsubscribe email to the specified mailto URL
   async sendUnsubscribeEmail(mailtoUrl) {
     const url = new URL(mailtoUrl);
@@ -193,6 +292,72 @@ class GmailService {
       method: 'POST', 
       body: { raw: encoded } 
     });
+  }
+
+  // Executes unsubscribe request via desktop API, browser, or mailto email
+  async unsubscribe(sender) {
+    if (!sender) throw new Error('No sender provided');
+
+    const cleanEmail = cleanSenderEmail(sender.from);
+    await saveUnsubscribedEmail(cleanEmail);
+
+    if (sender.https) {
+      if (window.desktopAPI?.unsubscribe) {
+        const result = await window.desktopAPI.unsubscribe({
+          url: sender.https,
+          oneClick: sender.oneClick,
+        });
+
+        if (!result.ok) {
+          throw new Error(result.error || `HTTPS Unsubscribe Failed: ${result.status}`);
+        }
+        return {
+          ok: true,
+          type: 'https',
+          message: `Unsubscribe request sent for ${sender.from}`,
+        };
+      } else {
+        window.open(sender.https, '_blank');
+        return {
+          ok: true,
+          type: 'https',
+          message: `Opened unsubscribe page for ${sender.from}`,
+        };
+      }
+    } else if (sender.mailto) {
+      await this.sendUnsubscribeEmail(sender.mailto);
+      return {
+        ok: true,
+        type: 'mailto',
+        message: `Unsubscribe email sent to ${sender.from}`,
+      };
+    }
+
+    throw new Error(`No unsubscribe link or email found for ${sender.from}`);
+  }
+
+  // Marks an email as unsubscribed in local storage
+  async markUnsubscribed(senderOrEmail) {
+    const email = typeof senderOrEmail === 'string'
+      ? cleanSenderEmail(senderOrEmail)
+      : cleanSenderEmail(senderOrEmail?.from || '');
+    await saveUnsubscribedEmail(email);
+  }
+
+  // Removes an email from the unsubscribed list in local storage (undo)
+  async cancelUnsubscribe(senderOrEmail) {
+    const email = typeof senderOrEmail === 'string'
+      ? cleanSenderEmail(senderOrEmail)
+      : cleanSenderEmail(senderOrEmail?.from || '');
+    await removeUnsubscribedEmail(email);
+  }
+
+  // Marks an email as kept in local storage
+  async keepSender(senderOrEmail) {
+    const email = typeof senderOrEmail === 'string'
+      ? cleanSenderEmail(senderOrEmail)
+      : cleanSenderEmail(senderOrEmail?.from || '');
+    await saveKeptEmail(email);
   }
 }
 

@@ -1,26 +1,12 @@
-
 import { useEffect, useRef, useState } from 'react';
 import './App.css';
 import { getSenderIdentity } from './senderIdentity';
 import { gmailApi } from './gmail.js';
-import {
-  isAlreadyUnsubscribed,
-  saveUnsubscribedEmail,
-  isAlreadyKept,
-  saveKeptEmail,
-  removeUnsubscribedEmail,
-} from './storage';
 import RefreshLogo from '@components/RefreshLogo';
 import LogoutButton from '@components/LogoutButton';
 
-function parseUnsubscribe(listUnsub = '', listUnsubPost = '') {
-  const links = [...listUnsub.matchAll(/<([^>]+)>/g)].map((m) => m[1]);
-  return {
-    https: links.find((l) => l.startsWith('https://')),
-    mailto: links.find((l) => l.startsWith('mailto:')),
-    oneClick: /One-Click/i.test(listUnsubPost),
-  };
-}
+const UNDO_MS = 6000; // time for the user to undo an unsubscribe action
+const THRESHOLD = 110; // px of horizontal drag
 
 function SenderAvatar({ identity }) {
   const [failed, setFailed] = useState(false);
@@ -38,8 +24,6 @@ function SenderAvatar({ identity }) {
     </div>
   );
 }
-//px of horizontal drag  
-const THRESHOLD = 110;   
 
 function SenderCard({ senders, onDecision }) {
   const [i, setI] = useState(0);
@@ -53,7 +37,7 @@ function SenderCard({ senders, onDecision }) {
     setI(n => n + 1);
   };
 
-  //slide the card off screen in the chosen direction, then advance
+  // slide the card off screen in the chosen direction, then advance
   const flyOut = (action) => {
     const el = card.current;
     if (!el) return decide(action);
@@ -75,7 +59,7 @@ function SenderCard({ senders, onDecision }) {
     const dx = (drag.current.dx = e.clientX - drag.current.startX);
     card.current.style.transform = `translate(${dx}px, 0) rotate(${dx / 18}deg)`;
 
-    //fade in whichever label matches the direction of travel
+    // fade in whichever label matches the direction of travel
     const strength = Math.min(Math.abs(dx) / THRESHOLD, 1);
     card.current.querySelector('.verdict-no').style.opacity = dx < 0 ? strength : 0;
     card.current.querySelector('.verdict-yes').style.opacity = dx > 0 ? strength : 0;
@@ -88,7 +72,7 @@ function SenderCard({ senders, onDecision }) {
 
     if (Math.abs(dx) > THRESHOLD) return flyOut(dx < 0 ? 'unsubscribe' : 'keep');
 
-    //if you didnt drag far enogh then the card snaps back into place
+    // if you didn't drag far enough then the card snaps back into place
     card.current.style.transition = 'transform .3s ease';
     card.current.style.transform = 'translate(0,0) rotate(0)';
     card.current.querySelector('.verdict-no').style.opacity = 0;
@@ -153,7 +137,6 @@ function SenderCard({ senders, onDecision }) {
   );
 }
 
-
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [failed, setFailed] = useState([]);
@@ -205,13 +188,12 @@ export default function App() {
   };
 
   const loadSenders = async () => {
-    // Start fresh loading session (cancels any previously active requests in the service)
-    gmailApi.beginLoading();
-
+    if (loadInFlight.current) return;
     loadInFlight.current = true;
     setLoading(true);
     setStatus('');
     setLoadError('');
+    setFailed([]);
     setLoadProgress('Loading your emails...');
 
     try {
@@ -221,13 +203,7 @@ export default function App() {
         }
       };
 
-      const q = encodeURIComponent('category:promotions OR unsubscribe');
-      const listData = await gmailApi.fetchPromotions(
-        'category:promotions OR unsubscribe',
-        onRetry
-      );
-
-      const details = await gmailApi.fetchMessageDetails(listData.messages || [], {
+      const data = await gmailApi.loadSenders({
         onRetry,
         onProgress: (done, total) => {
           if (gmailApi.isActive) {
@@ -236,69 +212,8 @@ export default function App() {
         },
       });
 
-      const bySender = {};
-
-      for (const msg of details) {
-        const h = Object.fromEntries(
-          (msg.payload?.headers || []).map((x) => [
-            x.name.toLowerCase(),
-            x.value,
-          ])
-        );
-
-        if (!h['list-unsubscribe'] || !h.from) continue;
-
-        const from = h.from;
-
-        if (!bySender[from]) {
-          bySender[from] = {
-            from,
-            count: 0,
-            unread: 0,
-            latest: null,
-            ...parseUnsubscribe(
-              h['list-unsubscribe'],
-              h['list-unsubscribe-post']
-            ),
-          };
-        }
-
-        const sender = bySender[from];
-        sender.count++;
-
-        if ((msg.labelIds || []).includes('UNREAD')) {
-          sender.unread++;
-        }
-
-        const timestamp = Number(msg.internalDate);
-
-        if (!sender.latest || timestamp > sender.latest.timestamp) {
-          sender.latest = {
-            timestamp,
-            subject: h.subject || '(No subject)',
-            snippet: msg.snippet || 'No preview available.',
-          };
-        }
-      }
-
-      if (!gmailApi.isActive) return;
-
-      const ranked = Object.values(bySender)
-        .map((s) => ({ ...s, opened: s.count - s.unread }))
-        .sort((a, b) => b.count - a.count);
-
-      //filters the email you already unsubscribed from
-      const filtered = [];
-      for (const s of ranked) {
-        if (!gmailApi.isActive) return;
-        const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
-        if (!(await isAlreadyUnsubscribed(cleanEmail)) && !(await isAlreadyKept(cleanEmail))) {
-          filtered.push(s);
-        }
-      }
-
-      if (gmailApi.isActive) {
-        setSenders(filtered);
+      if (gmailApi.isActive && data) {
+        setSenders(data);
       }
     } catch (err) {
       if (gmailApi.isCancelled(err)) {
@@ -307,8 +222,8 @@ export default function App() {
       console.error('Failed to load emails:', err);
       setLoadError(err.message || 'Failed to load emails. Please try again.');
 
-      if (err.message.includes('session expired') || err.message.includes('401')) {
-        setIsAuthenticated(false); //Reset back to login
+      if (err.message?.includes('session expired') || err.message?.includes('401')) {
+        setIsAuthenticated(false); // Reset back to login
         setStatus('Session expired. Please log in again.');
       }
     } finally {
@@ -335,6 +250,7 @@ export default function App() {
       setLoadProgress('');
       setLoadError('');
       setSenders([]);
+      setFailed([]);
       setIsAuthenticated(false);
       setStatus('Signed out.');
 
@@ -347,33 +263,17 @@ export default function App() {
 
   const handleUnsubscribe = async (s) => {
     try {
-      const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
-      await saveUnsubscribedEmail(cleanEmail); //save to mem when they click unsubscribed
-      
-      if (s.https) {
-        if (window.desktopAPI?.unsubscribe) {
-          const result = await window.desktopAPI.unsubscribe({ url: s.https, oneClick: s.oneClick });
-
-          if (!result.ok) throw new Error(result.error || `HTTPS Unsubscribe Failed: ${result.status}`);
-          setStatus(`Unsubscribe email sent to ${s.from}`);
-        } else {
-          window.open(s.https, '_blank');
-        }
-      } else if (s.mailto) {
-        const ok = await gmailApi.sendUnsubscribeEmail(s.mailto);
-        setStatus(`Unsubscribe email sent to ${s.from}`);
-      }
+      const result = await gmailApi.unsubscribe(s);
+      setStatus(result.message || `Unsubscribed from ${s.from}`);
     } catch (err) {
       console.error(err);
       setStatus('Unsubscribe failed. Check the console.');
       setFailed((f) => [...f, s.from]);
     }
   };
-    const scheduleUnsubscribe = async (s) => {
 
-    const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
-    await saveUnsubscribedEmail(cleanEmail);
-    
+  const scheduleUnsubscribe = async (s) => {
+    await gmailApi.markUnsubscribed(s);
     setPending((p) => [...p, s]);
     timers.current[s.from] = setTimeout(() => {
       delete timers.current[s.from];
@@ -386,37 +286,31 @@ export default function App() {
     clearTimeout(timers.current[s.from]);
     delete timers.current[s.from];
     setPending((p) => p.filter((x) => x.from !== s.from));
-    
-    // REMOVE FROM YOUR MEMORY
-    const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
-    await removeUnsubscribedEmail(cleanEmail);
 
+    await gmailApi.cancelUnsubscribe(s);
     setStatus(`Cancelled unsubscribe for ${s.from}`);
   };
 
   const handleDecision = async (sender, action) => {
-    const cleanEmail = sender.from.match(/<([^>]+)>/)?.[1] || sender.from;
-    
     if (action === 'unsubscribe') {
-      scheduleUnsubscribe(sender); // This starts her timer
+      scheduleUnsubscribe(sender);
     } else {
-      await saveKeptEmail(cleanEmail); 
+      await gmailApi.keepSender(sender);
       setStatus(`Kept ${sender.from}`);
     }
-  
   };
 
   return (
-      <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif', overflowX: 'hidden' }}>
-        <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
-          <h1>MailBroom</h1>
-          {isAuthenticated ? (
-            <>
-              <RefreshLogo size={50} onRefresh={() => loadSenders()} />
-              <LogoutButton onLogout={handleLogout} />
-            </>
-          ) : null}
-        </div>
+    <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif', overflowX: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
+        <h1>MailBroom</h1>
+        {isAuthenticated ? (
+          <>
+            <RefreshLogo size={50} onRefresh={() => loadSenders()} />
+            <LogoutButton onLogout={handleLogout} />
+          </>
+        ) : null}
+      </div>
 
       {!isAuthenticated ? (
         <button disabled={loading} onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
@@ -428,12 +322,12 @@ export default function App() {
           {loadError && !loading && (
             <div role="alert">
               <p>{loadError}</p>
-              <button onClick={() => loadSenders(isAuthenticated)}>Retry loading emails</button>
+              <button onClick={() => loadSenders()}>Retry loading emails</button>
               <button onClick={handleLogin}>Sign in again</button>
             </div>
           )}
           {status && <p>{status}</p>}
-            
+
           <div className="undo-container">
             {pending.map((s) => (
               <div key={s.from} className="undo-bar">
@@ -442,11 +336,11 @@ export default function App() {
               </div>
             ))}
           </div>
-          
+
           {!loading && senders.length > 0 && (
             <SenderCard senders={senders} onDecision={handleDecision} />
           )}
-                    {failed.length > 0 && (
+          {failed.length > 0 && (
             <div className="card-failed">
               <p>Couldn't unsubscribe from {failed.length}:</p>
               <ul>{failed.map((f) => <li key={f}>{f}</li>)}</ul>
