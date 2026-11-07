@@ -1,7 +1,7 @@
 import type { CapacitorElectronConfig } from '@capacitor-community/electron';
 import { getCapacitorElectronConfig, setupElectronDeepLinking } from '@capacitor-community/electron';
 import type { MenuItemConstructorOptions } from 'electron';
-import { app, MenuItem, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, MenuItem, BrowserWindow, ipcMain, shell, safeStorage } from 'electron';
 import { OAuth2Client } from 'google-auth-library';
 import electronIsDev from 'electron-is-dev';
 import unhandled from 'electron-unhandled';
@@ -40,6 +40,66 @@ const oAuth2Client = new OAuth2Client({
 if (oAuth2Client.transporter) {
   oAuth2Client.transporter.defaults.fetchImplementation = fetch;
 }
+
+// Token Storage Helper Functions
+const TOKEN_FILE_NAME = 'gmail-refresh-token.enc';
+function getTokenFilePath(): string {
+  return path.join(app.getPath('userData'), TOKEN_FILE_NAME);
+}
+
+function saveRefreshToken(refreshToken: string): boolean {
+  try {
+    const tokenPath = getTokenFilePath();
+    if (safeStorage.isEncryptionAvailable()) {
+      const encrypted = safeStorage.encryptString(refreshToken);
+      fs.writeFileSync(tokenPath, encrypted);
+      return true;
+    } else {
+      console.warn('safeStorage encryption is unavailable on this platform.');
+      return false;
+    }
+  } catch (err) {
+    console.error('Failed to encrypt and store refresh token:', err);
+    return false;
+  }
+}
+
+function loadRefreshToken(): string | null {
+  try {
+    const tokenPath = getTokenFilePath();
+    if (!fs.existsSync(tokenPath)) {
+      return null;
+    }
+    if (!safeStorage.isEncryptionAvailable()) {
+      console.warn('safeStorage encryption is unavailable on this platform.');
+      return null;
+    }
+    const encrypted = fs.readFileSync(tokenPath);
+    return safeStorage.decryptString(encrypted);
+  } catch (err) {
+    console.error('Failed to decrypt stored refresh token. Clearing corrupted/invalid file:', err);
+    clearRefreshToken();
+    return null;
+  }
+}
+
+function clearRefreshToken(): void {
+  try {
+    const tokenPath = getTokenFilePath();
+    if (fs.existsSync(tokenPath)) {
+      fs.unlinkSync(tokenPath);
+    }
+  } catch (err) {
+    console.error('Failed to delete stored refresh token file:', err);
+  }
+}
+
+// Automatically save refreshed tokens if Google rotates the refresh token
+oAuth2Client.on('tokens', (newTokens) => {
+  if (newTokens.refresh_token) {
+    saveRefreshToken(newTokens.refresh_token);
+  }
+});
 
 // Graceful handling of unhandled errors.
 unhandled();
@@ -80,8 +140,7 @@ if (electronIsDev) {
     // Initialize our app, build windows, and load content.
     myCapacitorApp.init();
 
-    // ... existing capacitor window creation ...
-
+    // IPC: Interactive Google OAuth login
     ipcMain.handle('electron-google-login', async () => {
       return new Promise((resolve, reject) => {
         const authWindow = new BrowserWindow({ width: 500, height: 600 });
@@ -96,6 +155,7 @@ if (electronIsDev) {
 
         const authUrl = oAuth2Client.generateAuthUrl({
           access_type: 'offline',
+          prompt: 'consent', // Ensures Google returns a refresh_token
           scope: ['https://mail.google.com/']
         });
 
@@ -109,6 +169,10 @@ if (electronIsDev) {
             const code = parsedUrl.searchParams.get('code');
             try {
               const { tokens } = await oAuth2Client.getToken(code!);
+              oAuth2Client.setCredentials(tokens);
+              if (tokens.refresh_token) {
+                saveRefreshToken(tokens.refresh_token);
+              }
               resolve(tokens.access_token);
             } catch (err) {
               reject(err);
@@ -116,6 +180,32 @@ if (electronIsDev) {
           }
         });
       });
+    });
+
+    // IPC: Silent retrieval/refresh of access token using stored safeStorage refresh token
+    ipcMain.handle('electron-get-access-token', async () => {
+      const refreshToken = loadRefreshToken();
+      if (!refreshToken) return null;
+
+      oAuth2Client.setCredentials({ refresh_token: refreshToken });
+      try {
+        const { token } = await oAuth2Client.getAccessToken();
+        return token || null;
+      } catch (err: any) {
+        console.error('Failed to get access token using refresh token:', err);
+        if (err?.message?.includes('invalid_grant')) {
+          clearRefreshToken();
+          oAuth2Client.setCredentials({});
+        }
+        return null;
+      }
+    });
+
+    // IPC: Logout - deletes encrypted token and resets credentials
+    ipcMain.handle('electron-logout', async () => {
+      clearRefreshToken();
+      oAuth2Client.setCredentials({});
+      return { ok: true };
     });
   });
 
