@@ -1,5 +1,5 @@
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './App.css';
 import { getSenderIdentity } from './senderIdentity';
 import { gmailApi } from './gmail.js';
@@ -11,6 +11,7 @@ import {
   removeUnsubscribedEmail,
 } from './storage';
 import RefreshLogo from '@components/RefreshLogo';
+import LogoutButton from '@components/LogoutButton';
 
 function parseUnsubscribe(listUnsub = '', listUnsubPost = '') {
   const links = [...listUnsub.matchAll(/<([^>]+)>/g)].map((m) => m[1]);
@@ -166,6 +167,27 @@ export default function App() {
   const timers = useRef({});
   const [pending, setPending] = useState([]);
 
+  // Check for auto-login on load
+  useEffect(() => {
+    let isMounted = true;
+    const checkAutoLogin = async () => {
+      try {
+        const token = await gmailApi.authenticate(false);
+        if (token && isMounted) {
+          setIsAuthenticated(true);
+          await loadSenders();
+        }
+      } catch (err) {
+        console.warn('Auto-login check failed:', err);
+      }
+    };
+    checkAutoLogin();
+    return () => {
+      isMounted = false;
+      gmailApi.cancelActiveRequests();
+    };
+  }, []);
+
   const handleLogin = async () => {
     if (loginInFlight.current) return;
     loginInFlight.current = true;
@@ -181,20 +203,37 @@ export default function App() {
       setLoading(false);
     }
   };
+
   const loadSenders = async () => {
-    if (loadInFlight.current) return;
+    // Start fresh loading session (cancels any previously active requests in the service)
+    gmailApi.beginLoading();
+
     loadInFlight.current = true;
     setLoading(true);
     setStatus('');
     setLoadError('');
     setLoadProgress('Loading your emails...');
+
     try {
-      const onRetry = (seconds) => setLoadProgress(`Gmail is busy. Retrying in ${seconds}s...`);
+      const onRetry = (seconds) => {
+        if (gmailApi.isActive) {
+          setLoadProgress(`Gmail is busy. Retrying in ${seconds}s...`);
+        }
+      };
+
       const q = encodeURIComponent('category:promotions OR unsubscribe');
-      const listData = await gmailApi.fetchPromotions('category:promotions OR unsubscribe', onRetry);
+      const listData = await gmailApi.fetchPromotions(
+        'category:promotions OR unsubscribe',
+        onRetry
+      );
+
       const details = await gmailApi.fetchMessageDetails(listData.messages || [], {
         onRetry,
-        onProgress: (done, total) => setLoadProgress(`Loading emails: ${done} of ${total}...`),
+        onProgress: (done, total) => {
+          if (gmailApi.isActive) {
+            setLoadProgress(`Loading emails: ${done} of ${total}...`);
+          }
+        },
       });
 
       const bySender = {};
@@ -241,21 +280,30 @@ export default function App() {
           };
         }
       }
+
+      if (!gmailApi.isActive) return;
+
       const ranked = Object.values(bySender)
         .map((s) => ({ ...s, opened: s.count - s.unread }))
         .sort((a, b) => b.count - a.count);
 
-        //filters the email you already unsubscribed from
+      //filters the email you already unsubscribed from
       const filtered = [];
       for (const s of ranked) {
-          const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
-          if (!(await isAlreadyUnsubscribed(cleanEmail)) && !(await isAlreadyKept(cleanEmail))) 
-            {
-             filtered.push(s);
-          }
+        if (!gmailApi.isActive) return;
+        const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+        if (!(await isAlreadyUnsubscribed(cleanEmail)) && !(await isAlreadyKept(cleanEmail))) {
+          filtered.push(s);
+        }
       }
-      setSenders(filtered);
+
+      if (gmailApi.isActive) {
+        setSenders(filtered);
+      }
     } catch (err) {
+      if (gmailApi.isCancelled(err)) {
+        return;
+      }
       console.error('Failed to load emails:', err);
       setLoadError(err.message || 'Failed to load emails. Please try again.');
 
@@ -264,9 +312,36 @@ export default function App() {
         setStatus('Session expired. Please log in again.');
       }
     } finally {
+      if (gmailApi.isActive) {
+        loadInFlight.current = false;
+        setLoading(false);
+        setLoadProgress('');
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
       loadInFlight.current = false;
+      loginInFlight.current = false;
+
+      // Clear any pending unsubscribe timers
+      Object.values(timers.current).forEach((t) => clearTimeout(t));
+      timers.current = {};
+      setPending([]);
+
+      // Reset UI state
       setLoading(false);
       setLoadProgress('');
+      setLoadError('');
+      setSenders([]);
+      setIsAuthenticated(false);
+      setStatus('Signed out.');
+
+      // Logout of gmailApi, clears tokens and processing requests
+      await gmailApi.logout();
+    } catch (err) {
+      console.error('Logout failed:', err);
     }
   };
 
@@ -333,9 +408,14 @@ export default function App() {
 
   return (
       <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif', overflowX: 'hidden' }}>
-        <div style={{display: 'flex', flexDirection: 'row', justifyContent:'center'}}>
+        <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
           <h1>MailBroom</h1>
-          {isAuthenticated ? (<RefreshLogo size={60} onRefresh={() => loadSenders(isAuthenticated)} />) : null}
+          {isAuthenticated ? (
+            <>
+              <RefreshLogo size={50} onRefresh={() => loadSenders()} />
+              <LogoutButton onLogout={handleLogout} />
+            </>
+          ) : null}
         </div>
 
       {!isAuthenticated ? (
