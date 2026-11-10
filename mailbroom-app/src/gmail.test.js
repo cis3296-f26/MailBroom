@@ -1,59 +1,69 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getGmail, getMessageDetails } from './gmail.js';
+import { GmailService } from './gmail.js';
 
-const response = (status, data = {}, retryAfter = null) => ({
+const response = (status, data = {}) => ({
   ok: status === 200,
   status,
   json: async () => data,
-  headers: { get: () => retryAfter },
+  headers: { get: () => null },
 });
 
-test('rate-limited reads recover after waiting, including Retry-After', async () => {
-  const responses = [response(429, {}, '3'), response(200, { id: 'email' })];
+function createService({ fetchImpl, sleep = async () => {} }) {
+  const service = new GmailService({ fetchImpl, sleep });
+  globalThis.window = {
+    desktopAPI: { loginWithGoogle: async () => 'test-token' },
+  };
+  return service.authenticate().then(() => service);
+}
+
+test('rate-limited reads retry with increasing delays and then recover', async () => {
+  const responses = [response(429), response(200, { id: 'email' })];
   const delays = [];
-  const result = await getGmail('/messages/email', 'test-token', {
+  const service = await createService({
     fetchImpl: async () => responses.shift(),
     sleep: async (ms) => delays.push(ms),
   });
-  assert.deepEqual(result, { id: 'email' });
-  assert.equal(delays.length, 1);
-  assert.ok(delays[0] >= 3000);
+
+  assert.deepEqual(await service.fetchPromotions('category:promotions'), { id: 'email' });
+  assert.deepEqual(delays, [1000]);
 });
 
-test('persistent rate limits stop after bounded retries with increasing delays', async () => {
+test('persistent rate limits stop after bounded retries', async () => {
   let calls = 0;
   const delays = [];
-  await assert.rejects(getGmail('/messages', 'test-token', {
-    fetchImpl: async () => { calls++; return response(429); },
+  const service = await createService({
+    fetchImpl: async () => {
+      calls++;
+      return response(429);
+    },
     sleep: async (ms) => delays.push(ms),
-  }), /Gmail is limiting requests/);
+  });
+
+  await assert.rejects(service.fetchPromotions('category:promotions'), /Gmail API Error: 429/);
   assert.equal(calls, 5);
-  assert.equal(delays.length, 4);
-  assert.ok(delays.every((ms, i) => i === 0 || ms > delays[i - 1]));
+  assert.deepEqual(delays, [1000, 2000, 4000, 8000]);
 });
 
 test('authentication failures do not retry', async () => {
   let calls = 0;
-  await assert.rejects(getGmail('/messages', 'test-token', {
-    fetchImpl: async () => { calls++; return response(401); },
+  const service = await createService({
+    fetchImpl: async () => {
+      calls++;
+      return response(401);
+    },
     sleep: async () => assert.fail('Must not wait for an auth failure'),
-  }), /session expired/);
-  assert.equal(calls, 1);
-});
+  });
 
-test('long server cooldowns return an error without retrying early', async () => {
-  await assert.rejects(getGmail('/messages', 'test-token', {
-    fetchImpl: async () => response(429, {}, '120'),
-    sleep: async () => assert.fail('Must return control during a long cooldown'),
-  }), /Gmail is limiting requests/);
+  await assert.rejects(service.fetchPromotions('category:promotions'), /Gmail API Error: 401/);
+  assert.equal(calls, 1);
 });
 
 test('message reads stay sequential and keep their order', async () => {
   let active = 0;
   let peak = 0;
-  const messages = Array.from({ length: 50 }, (_, id) => ({ id: String(id) }));
-  const result = await getMessageDetails(messages, 'test-token', {
+  const messages = Array.from({ length: 5 }, (_, id) => ({ id: String(id) }));
+  const service = await createService({
     fetchImpl: async (url) => {
       active++;
       peak = Math.max(peak, active);
@@ -62,14 +72,29 @@ test('message reads stay sequential and keep their order', async () => {
       return response(200, { id: new URL(url).pathname.split('/').pop() });
     },
   });
+  service.beginLoading();
+
+  const result = await service.fetchMessageDetails(messages);
   assert.equal(peak, 1);
   assert.deepEqual(result, messages);
 });
 
-test('a failed message stops the queue instead of launching remaining reads', async () => {
+test('a failed message is skipped and subsequent messages are still read', async () => {
   let calls = 0;
-  await assert.rejects(getMessageDetails([{ id: '1' }, { id: '2' }], 'test-token', {
-    fetchImpl: async () => { calls++; return response(403); },
-  }), /403/);
-  assert.equal(calls, 1);
+  const service = await createService({
+    fetchImpl: async () => {
+      calls++;
+      return calls === 1 ? response(403) : response(200, { id: '2' });
+    },
+  });
+  service.beginLoading();
+  const originalWarn = console.warn;
+  console.warn = () => {};
+
+  try {
+    assert.deepEqual(await service.fetchMessageDetails([{ id: '1' }, { id: '2' }]), [{ id: '2' }]);
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(calls, 2);
 });

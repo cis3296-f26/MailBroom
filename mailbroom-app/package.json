@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "oxlint .",
+    "test": "node --test",
+    "test:watch": "node --test --watch",
     "preview": "vite preview",
     "desktop": "npm run build && npx cap copy @capacitor-community/electron && npx cap open @capacitor-community/electron",
     "electron:sync": "npm run build && npx cap copy @capacitor-community/electron && node -e \"require('fs').copyFileSync('credentials.json', 'electron/credentials.json')\"",

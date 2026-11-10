@@ -1,62 +1,42 @@
 import { Preferences } from '@capacitor/preferences';
 
+export function createEmailStorage(preferences = Preferences) {
+  async function readList(key) {
+    const { value } = await preferences.get({ key });
+    return JSON.parse(value || '[]');
+  }
 
-// This function takes an email address and saves it to the browser's local memory
-//so if the user refreshes the app, it remembers they unsubscribed
+  async function writeList(key, emails) {
+    await preferences.set({ key, value: JSON.stringify(emails) });
+  }
 
-export async function saveUnsubscribedEmail(email) {
-    // Get the saved list from memory
-
-    const { value } = await Preferences.get({ key: 'unsubscribedEmails' });
-    const saved = JSON.parse(value || '[]');
-    
-    // Check if the email is not already in the list 
+  async function saveEmail(key, email) {
+    const saved = await readList(key);
     if (!saved.includes(email)) {
-        saved.push(email); // Add the new email to the list
-        // Save the updated list back to memory
-
-        await Preferences.set({
-            key: 'unsubscribedEmails',
-            value: JSON.stringify(saved)
-        });
+      saved.push(email);
+      await writeList(key, saved);
     }
+  }
+
+  return {
+    saveUnsubscribedEmail: (email) => saveEmail('unsubscribedEmails', email),
+    isAlreadyUnsubscribed: async (email) =>
+      (await readList('unsubscribedEmails')).includes(email),
+    removeUnsubscribedEmail: async (email) => {
+      const saved = await readList('unsubscribedEmails');
+      await writeList('unsubscribedEmails', saved.filter((item) => item !== email));
+    },
+    saveKeptEmail: (email) => saveEmail('keptEmails', email),
+    isAlreadyKept: async (email) => (await readList('keptEmails')).includes(email),
+  };
 }
 
-// This function lets the app check if a sender has already been unsubscribed
-// returns true so the app can hide them & the user doesn't see them again
+const emailStorage = createEmailStorage();
 
-export async function isAlreadyUnsubscribed(email) {
-    const { value } = await Preferences.get({key: 'unsubscribedEmails'})
-    const saved = JSON.parse(value || '[]');
-    return saved.includes(email);
-}
-
-// If the user clicks Undo or un-unsubscribe, remove the email from the memory list
-
-export async function removeUnsubscribedEmail(email) {
-    const { value } = await Preferences.get({key: 'unsubscribedEmails'});
-    let saved = JSON.parse(value || '[]');
-    
-    // Filter out the email we want to remove 
-    saved = saved.filter(e => e !== email); 
-    // Save the new list back to memory
-    await Preferences.set({
-        key: 'unsubscribedEmails',
-        value: JSON.stringify(saved)
-    });
-}
-
-export async function saveKeptEmail(email) {
-    const { value } = await Preferences.get({ key: 'keptEmails' });
-    const saved = JSON.parse(value || '[]');
-    if (!saved.includes(email)) {
-        saved.push(email);
-        await Preferences.set({ key: 'keptEmails', value: JSON.stringify(saved) });
-    }
-}
-
-export async function isAlreadyKept(email) {
-    const { value } = await Preferences.get({ key: 'keptEmails' });
-    const saved = JSON.parse(value || '[]');
-    return saved.includes(email);
-}
+export const {
+  saveUnsubscribedEmail,
+  isAlreadyUnsubscribed,
+  removeUnsubscribedEmail,
+  saveKeptEmail,
+  isAlreadyKept,
+} = emailStorage;
