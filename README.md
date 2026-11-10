@@ -11,6 +11,8 @@ This project has been migrated from a Python/Flask proof-of-concept to a **cross
 - **Authentication:** Google OAuth 2.0 (Google Identity Services & `google-auth-library`)
 - **Data:** Gmail API
 
+**Want to use MailBroom on a Mac?** See [INSTALL-MAC.md](INSTALL-MAC.md).
+
 ### Features Not Yet Implemented
 - Sending the actual unsubscribe network request.
 - Spam filtering after completing an unsubscribe request.
