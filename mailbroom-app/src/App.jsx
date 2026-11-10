@@ -181,6 +181,7 @@ export default function App() {
       await loadSenders();
     } catch (error) {
       console.error('Login failed:', error);
+      setStatus("The sign in didn't complete. If this is your first time trying to use MailBroom, your Gmail address may not be approved for testing (yet)... Send it to the team and try again.");
     } finally {
       loginInFlight.current = false;
       setLoading(false);
@@ -311,11 +312,24 @@ export default function App() {
           </>
         ) : null}
       </div>
-
+      
       {!isAuthenticated ? (
-        <button disabled={loading} onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
-          {loading ? 'Signing in...' : 'Login with Google'}
-        </button>
+      <>
+      <button disabled={loading} onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
+        {loading ? 'Signing in...' : 'Login with Google'}
+      </button>
+
+      {status && (
+        <p role="alert" style={{ maxWidth: 420, margin: '16px auto', color: '#b45309' }}>
+          {status}
+        </p>
+      )}
+
+          <p style={{ maxWidth: 420, margin: '16px auto', color: '#6b7280', fontSize: 14 }}>
+            Google will warn that MailBroom is not verified. This is an expected warning...
+            Please click "Advanced", then "Go to MailBroom (unsafe)" to continue.
+          </p>
+        </>
       ) : (
         <div>
           {loading && <p role="status">{loadProgress || 'Loading your emails...'}</p>}
