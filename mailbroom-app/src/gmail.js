@@ -42,6 +42,13 @@ function parseUnsubscribe(listUnsub = '', listUnsubPost = '') {
 class GmailService {
   #token = null;
   #controller = null;
+  #fetchImpl;
+  #sleep;
+
+  constructor({ fetchImpl = fetch, sleep = wait } = {}) {
+    this.#fetchImpl = fetchImpl;
+    this.#sleep = sleep;
+  }
 
   // Cancels previous requests, initializes abortController
   beginLoading() {
@@ -114,8 +121,8 @@ class GmailService {
     const signal = options.signal || this.currentSignal;
     const {
       onRetry = () => {},
-      fetchImpl = fetch,
-      sleep = wait,
+      fetchImpl = this.#fetchImpl,
+      sleep = this.#sleep,
       method = 'GET',
       body,
       _retriedAuth = false,
@@ -361,4 +368,5 @@ class GmailService {
   }
 }
 
+export { GmailService };
 export const gmailApi = new GmailService();
