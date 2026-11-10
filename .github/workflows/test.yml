@@ -1,0 +1,40 @@
+name: Node.js Test Suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run npm test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22 # Must follow build.yml
+          cache: 'npm'
+          cache-dependency-path: |
+            mailbroom-app/package-lock.json
+            mailbroom-app/electron/package-lock.json
+
+      - name: Install React Dependencies
+        run: |
+          cd mailbroom-app
+          npm ci
+
+      - name: Install Electron Dependencies
+        run: |
+          cd mailbroom-app/electron
+          npm ci
+
+      - name: Run Tests
+        run: |
+          cd mailbroom-app
+          npm test
