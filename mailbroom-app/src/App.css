@@ -190,8 +190,10 @@
 }
  
 .card {
+  box-sizing: border-box;
   width: 100%;
-  max-width: 360px;
+  max-width: 600px;
+  text-align: left;
   min-height: 180px;
   margin: 0 auto;
   background: #fff;
@@ -204,9 +206,67 @@
   justify-content: center;
 }
  
+.sender-heading { display: flex; align-items: center; gap: 14px; }
+.sender-details { min-width: 0; }
+.sender-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 18px;
+  font-weight: 700;
+  overflow: hidden;
+}
+.sender-avatar img { width: 32px; height: 32px; object-fit: contain; }
+.sender-email { margin-top: 4px; color: #6b7280; font-size: 13px; overflow-wrap: anywhere; }
 .card-from   { font-size: 17px; font-weight: 600; word-break: break-word; }
 .card-stats  { color: #6b7280; margin-top: 12px; font-size: 15px; }
 .card-never  { color: #b45309; font-size: 13px; margin-top: 8px; }
+
+.email-preview {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.preview-label {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.preview-date {
+  margin-top: 8px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.preview-subject {
+  margin-top: 10px;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.preview-snippet {
+  margin: 8px 0 0;
+  color: #4b5563;
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
  
 .card-buttons { margin-top: 24px; display: flex; gap: 16px; justify-content: center; }
 .card-buttons button {
@@ -223,6 +283,28 @@
  
 .card-done { text-align: center; color: #6b7280; padding: 40px 0; }
 
+/*This is for the swipe gestures*/
+.card {
+  position: relative;
+  cursor: grab;
+  touch-action: none;    
+  user-select: none;
+}
+.card:active { cursor: grabbing; }
+
+.verdict {
+  position: absolute;
+  top: 16px;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 3px solid;
+  opacity: 0;
+  pointer-events: none;
+}
+.verdict-no  { left: 16px;  color: #D2042D; border-color: #D2042D; transform: rotate(-12deg); }
+.verdict-yes { right: 16px; color: #16a34a; border-color: #16a34a; transform: rotate(12deg); }
 .undo-container {
   position: fixed;
   bottom: 20px;

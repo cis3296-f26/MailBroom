@@ -6,6 +6,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build for ${{ matrix.os }}
@@ -17,7 +20,7 @@ jobs:
           - os: windows-latest
             platform: --win
           - os: macos-latest
-            platform: --mac
+            platform: --mac --universal
           - os: ubuntu-latest
             platform: --linux
 
@@ -28,7 +31,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: |
             mailbroom-app/package-lock.json

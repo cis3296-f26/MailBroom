@@ -1,6 +1,6 @@
 {
   "name": "MailBroom",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "An Amazing Capacitor App",
   "author": {
     "name": "",
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/cis3296-f26/MailBroom.git"
   },
   "license": "MIT",
   "main": "build/src/index.js",
@@ -20,7 +20,7 @@
     "electron:make": "npm run build && electron-builder build -p never",
     "electron:portableWin": "npm run build && electron-builder build --win portable -p never",
     "electron:portableLinux": "npm run build && electron-builder build --linux appImage -p never",
-    "electron:portableMac": "npm run build && electron-builder build --mac dmg -p never"
+    "electron:portableMac": "npm run build && electron-builder build --mac dmg --universal -p never"
   },
   "dependencies": {
     "@capacitor-community/electron": "^5.0.0",

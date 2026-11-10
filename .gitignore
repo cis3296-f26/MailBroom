@@ -54,3 +54,4 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+mailbroom-app/credentials.json

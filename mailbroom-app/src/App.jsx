@@ -1,143 +1,157 @@
-import { useState, useRef } from 'react';
-import { isAlreadyUnsubscribed, saveUnsubscribedEmail, isAlreadyKept, saveKeptEmail, removeUnsubscribedEmail } from './storage';
+import { useEffect, useRef, useState } from 'react';
 import './App.css';
+import { getSenderIdentity } from './senderIdentity';
+import { gmailApi } from './gmail.js';
+import RefreshLogo from '@components/RefreshLogo';
+import LogoutButton from '@components/LogoutButton';
 import Login from './Login';
 import UndoPopup from './UndoPopup';
 import SenderCard from './SenderCard';
 
-const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
-const UNDO_MS = 6000; //time for the user to undo an unsubscribe action
+const UNDO_MS = 6000; // time for the user to undo an unsubscribe action
+const THRESHOLD = 110; // px of horizontal drag
 
-function parseUnsubscribe(listUnsub = '', listUnsubPost = '') {
-  const links = [...listUnsub.matchAll(/<([^>]+)>/g)].map((m) => m[1]);
-  return {
-    https: links.find((l) => l.startsWith('https://')),
-    mailto: links.find((l) => l.startsWith('mailto:')),
-    oneClick: /One-Click/i.test(listUnsubPost),
-  };
-}
-
-async function sendMailto(token, mailto) {
-  const url = new URL(mailto);
-  const clean = (s) => s.replace(/[\r\n]/g, ''); // header values come from the sender, so strip newlines
-  const to = clean(decodeURIComponent(url.pathname));
-  const subject = clean(url.searchParams.get('subject') || 'unsubscribe');
-  const raw = `To: ${to}\r\nSubject: ${subject}\r\n\r\nunsubscribe`;
-  const encoded = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const res = await fetch(`${GMAIL}/messages/send`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw: encoded }),
-  });
-  return res.ok;
-}
 
 
 
 export default function App() {
-  const [token, setToken] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [failed, setFailed] = useState([]);
   const [senders, setSenders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [loadProgress, setLoadProgress] = useState('');
+  const loadInFlight = useRef(false);
+  const loginInFlight = useRef(false);
   const timers = useRef({});
   const [pending, setPending] = useState([]);
 
+  // Check for auto-login on load
+  useEffect(() => {
+    let isMounted = true;
+    const checkAutoLogin = async () => {
+      try {
+        const token = await gmailApi.authenticate(false);
+        if (token && isMounted) {
+          setIsAuthenticated(true);
+          await loadSenders();
+        }
+      } catch (err) {
+        console.warn('Auto-login check failed:', err);
+      }
+    };
+    checkAutoLogin();
+    return () => {
+      isMounted = false;
+      gmailApi.cancelActiveRequests();
+    };
+  }, []);
+
   const handleLogin = async () => {
+    if (loginInFlight.current) return;
+    loginInFlight.current = true;
+    setLoading(true);
     try {
-      const accessToken = await window.desktopAPI.loginWithGoogle();
-      setToken(accessToken);
-      loadSenders(accessToken);
+      await gmailApi.authenticate();
+      setIsAuthenticated(true);
+      await loadSenders();
     } catch (error) {
       console.error('Login failed:', error);
+      setStatus("The sign in didn't complete. If this is your first time trying to use MailBroom, your Gmail address may not be approved for testing (yet)... Send it to the team and try again.");
+    } finally {
+      loginInFlight.current = false;
+      setLoading(false);
     }
   };
-  const loadSenders = async (accessToken) => {
+
+  const loadSenders = async () => {
+    if (loadInFlight.current) return;
+    loadInFlight.current = true;
     setLoading(true);
     setStatus('');
+    setLoadError('');
+    setFailed([]);
+    setLoadProgress('Loading your emails...');
+
     try {
-      const headers = { Authorization: `Bearer ${accessToken}` };
-      const q = encodeURIComponent('category:promotions OR unsubscribe');
-      const listRes = await fetch(`${GMAIL}/messages?maxResults=50&labelIds=INBOX&q=${q}`, { headers });
-      const listData = await listRes.json();
-      console.log('LIST', listRes.status, listData);
-      if (!listRes.ok) throw new Error(JSON.stringify(listData));
-      const { messages = [] } = listData;
-
-      const details = await Promise.all(
-        messages.map((m) =>
-          fetch(
-            `${GMAIL}/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post`,
-            { headers }
-          ).then((r) => r.json())
-        )
-      );
-      console.log('DETAILS', details.length, details[0]?.payload?.headers);
-
-      const bySender = {};
-      for (const msg of details) {
-        const h = Object.fromEntries((msg.payload?.headers || []).map((x) => [x.name.toLowerCase(), x.value]));
-        if (!h['list-unsubscribe']) continue; // skip senders with no unsubscribe option
-        const from = h['from'];
-        if (!bySender[from]) {
-                    bySender[from] = {
-            from,
-            count: 0,
-            unread: 0,
-            ...parseUnsubscribe(h['list-unsubscribe'], h['list-unsubscribe-post']),
-          };
-          
+      const onRetry = (seconds) => {
+        if (gmailApi.isActive) {
+          setLoadProgress(`Gmail is busy. Retrying in ${seconds}s...`);
         }
-        bySender[from].count++;
-        if ((msg.labelIds || []).includes('UNREAD')) bySender[from].unread++;
-      }
-            const ranked = Object.values(bySender)
-        .map((s) => ({ ...s, opened: s.count - s.unread }))
-        .sort((a, b) => b.count - a.count);
+      };
 
-        //filters the email you already unsubscribed from
-      const filtered = [];
-      for (const s of ranked) {
-          const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
-          if (!(await isAlreadyUnsubscribed(cleanEmail)) && !(await isAlreadyKept(cleanEmail))) 
-            {
-             filtered.push(s);
+      const data = await gmailApi.loadSenders({
+        onRetry,
+        onProgress: (done, total) => {
+          if (gmailApi.isActive) {
+            setLoadProgress(`Loading emails: ${done} of ${total}...`);
           }
+        },
+      });
+
+      if (gmailApi.isActive && data) {
+        setSenders(data);
       }
-setSenders(filtered);
     } catch (err) {
+      if (gmailApi.isCancelled(err)) {
+        return;
+      }
       console.error('Failed to load emails:', err);
-      setStatus('Failed to load emails. Check the console.');
+      setLoadError(err.message || 'Failed to load emails. Please try again.');
+
+      if (err.message?.includes('session expired') || err.message?.includes('401')) {
+        setIsAuthenticated(false); // Reset back to login
+        setStatus('Session expired. Please log in again.');
+      }
+    } finally {
+      if (gmailApi.isActive) {
+        loadInFlight.current = false;
+        setLoading(false);
+        setLoadProgress('');
+      }
     }
-    setLoading(false);
   };
-  
+
+  const handleLogout = async () => {
+    try {
+      loadInFlight.current = false;
+      loginInFlight.current = false;
+
+      // Clear any pending unsubscribe timers
+      Object.values(timers.current).forEach((t) => clearTimeout(t));
+      timers.current = {};
+      setPending([]);
+
+      // Reset UI state
+      setLoading(false);
+      setLoadProgress('');
+      setLoadError('');
+      setSenders([]);
+      setFailed([]);
+      setIsAuthenticated(false);
+      setStatus('Signed out.');
+
+      // Logout of gmailApi, clears tokens and processing requests
+      await gmailApi.logout();
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
 
   const handleUnsubscribe = async (s) => {
     try {
-      const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
-      await saveUnsubscribedEmail(cleanEmail); //save to mem when they click unsubscribed
-      
-      if (s.https) {
-        if (window.desktopAPI?.unsubscribe) {
-          const result = await window.desktopAPI.unsubscribe({ url: s.https, oneClick: s.oneClick });
-          setStatus(result.ok ? `Unsubscribe sent for ${s.from}` : `Failed: ${result.error || result.status}`);
-        } else {
-          window.open(s.https, '_blank');
-        }
-      } else if (s.mailto) {
-        const ok = await sendMailto(token, s.mailto);
-        setStatus(ok ? `Unsubscribe email sent to ${s.from}` : 'Failed to send unsubscribe email');
-      }
+      const result = await gmailApi.unsubscribe(s);
+      setStatus(result.message || `Unsubscribed from ${s.from}`);
     } catch (err) {
       console.error(err);
       setStatus('Unsubscribe failed. Check the console.');
+      setFailed((f) => [...f, s.from]);
     }
   };
-    const scheduleUnsubscribe = async (s) => {
 
-    const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
-    await saveUnsubscribedEmail(cleanEmail);
-    
+  const scheduleUnsubscribe = async (s) => {
+    await gmailApi.markUnsubscribed(s);
     setPending((p) => [...p, s]);
     timers.current[s.from] = setTimeout(() => {
       delete timers.current[s.from];
@@ -150,44 +164,70 @@ setSenders(filtered);
     clearTimeout(timers.current[s.from]);
     delete timers.current[s.from];
     setPending((p) => p.filter((x) => x.from !== s.from));
-    
-    // REMOVE FROM YOUR MEMORY
-    const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
-    await removeUnsubscribedEmail(cleanEmail);
 
+    await gmailApi.cancelUnsubscribe(s);
     setStatus(`Cancelled unsubscribe for ${s.from}`);
   };
 
   const handleDecision = async (sender, action) => {
-    const cleanEmail = sender.from.match(/<([^>]+)>/)?.[1] || sender.from;
-    
     if (action === 'unsubscribe') {
-      scheduleUnsubscribe(sender); // This starts her timer
+      scheduleUnsubscribe(sender);
     } else {
-      await saveKeptEmail(cleanEmail); 
+      await gmailApi.keepSender(sender);
       setStatus(`Kept ${sender.from}`);
     }
-  
   };
 
-  return (
-    <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif' }}>
-      <h1>MailBroom</h1>
-
-      {!token ? (
-        <Login onLogin={handleLogin} />
+    return (
+    <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif', overflowX: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
+        <h1>MailBroom</h1>
+        {isAuthenticated ? (
+          <>
+            <RefreshLogo size={50} onRefresh={() => loadSenders()} />
+            <LogoutButton onLogout={handleLogout} />
+          </>
+        ) : null}
+      </div>
+      
+      {!isAuthenticated ? (
+        <>
+          <Login onLogin={handleLogin} />
+          {status && (
+            <p role="alert" style={{ maxWidth: 420, margin: '16px auto', color: '#b45309' }}>
+              {status}
+            </p>
+          )}
+          <p style={{ maxWidth: 420, margin: '16px auto', color: '#6b7280', fontSize: 14 }}>
+            Google will warn that MailBroom is not verified. This is an expected warning...
+            Please click "Advanced", then "Go to MailBroom (unsafe)" to continue.
+          </p>
+        </>
       ) : (
         <div>
-          {loading && <p>Loading your emails...</p>}
+          {loading && <p role="status">{loadProgress || 'Loading your emails...'}</p>}
+          {loadError && !loading && (
+            <div role="alert">
+              <p>{loadError}</p>
+              <button onClick={() => loadSenders()}>Retry loading emails</button>
+              <button onClick={handleLogin}>Sign in again</button>
+            </div>
+          )}
           {status && <p>{status}</p>}
-            
+          
           <UndoPopup pending={pending} onUndo={undoUnsubscribe} />
           
           {!loading && senders.length > 0 && (
             <SenderCard senders={senders} onDecision={handleDecision} />
           )}
+          {failed.length > 0 && (
+            <div className="card-failed">
+              <p>Couldn't unsubscribe from {failed.length}:</p>
+              <ul>{failed.map((f) => <li key={f}>{f}</li>)}</ul>
+            </div>
+          )}
 
-          {!loading && senders.length === 0 && (
+          {!loading && !loadError && senders.length === 0 && (
             <p>No senders with an unsubscribe option in your 50 most recent emails.</p>
           )}
         </div>
