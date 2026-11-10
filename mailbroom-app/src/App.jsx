@@ -1,6 +1,9 @@
 import { useState, useRef } from 'react';
 import { isAlreadyUnsubscribed, saveUnsubscribedEmail, isAlreadyKept, saveKeptEmail, removeUnsubscribedEmail } from './storage';
 import './App.css';
+import Login from './Login';
+import UndoPopup from './UndoPopup';
+import SenderCard from './SenderCard';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const UNDO_MS = 6000; //time for the user to undo an unsubscribe action
@@ -29,38 +32,7 @@ async function sendMailto(token, mailto) {
   return res.ok;
 }
 
-function SenderCard({ senders, onDecision }) {
-  const [i, setI] = useState(0);
-  const sender = senders[i];
 
-  const decide = (action) => {
-    onDecision?.(sender, action);
-    setI(n => n + 1);
-  };
-
-  if (!sender) {
-    return <p className="card-done">All done. Reviewed {i} senders.</p>;
-  }
-
-  return (
-    <>
-      <div className="card-progress">{i} of {senders.length} reviewed</div>
-
-      <div className="card">
-        <div className="card-from">{sender.from}</div>
-        <div className="card-stats">
-          {sender.count} message{sender.count === 1 ? '' : 's'} · {sender.opened} opened
-        </div>
-        {sender.opened === 0 && <div className="card-never">never opened</div>}
-      </div>
-
-      <div className="card-buttons">
-        <button className="btn-unsub" onClick={() => decide('unsubscribe')}>Unsubscribe</button>
-        <button className="btn-keep" onClick={() => decide('keep')}>Keep</button>
-      </div>
-    </>
-  );
-}
 
 export default function App() {
   const [token, setToken] = useState(null);
@@ -203,22 +175,13 @@ setSenders(filtered);
       <h1>MailBroom</h1>
 
       {!token ? (
-        <button onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
-          Login with Google
-        </button>
+        <Login onLogin={handleLogin} />
       ) : (
         <div>
           {loading && <p>Loading your emails...</p>}
           {status && <p>{status}</p>}
             
-          <div className="undo-container">
-            {pending.map((s) => (
-              <div key={s.from} className="undo-bar">
-                Unsubscribing from {s.from}...{' '}
-                <button onClick={() => undoUnsubscribe(s)}>Undo</button>
-              </div>
-            ))}
-          </div>
+          <UndoPopup pending={pending} onUndo={undoUnsubscribe} />
           
           {!loading && senders.length > 0 && (
             <SenderCard senders={senders} onDecision={handleDecision} />
