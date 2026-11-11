@@ -142,7 +142,9 @@ export default function App() {
 
   const handleUnsubscribe = async (s) => {
     try {
-      const result = await gmailApi.unsubscribe(s); 
+      const result = await gmailApi.unsubscribe(s); // comment to test the spam filter
+      //const result = { ok: false, message: "Fake failure for testing" };
+      // ^==uncomment to test the spam filter ==^
       
       if (result.ok) {
         setStatus(result.message || `Unsubscribed from ${s.from}`);
@@ -159,13 +161,13 @@ export default function App() {
     }
   };
   
-  const scheduleUnsubscribe = async (s) => {
-    await gmailApi.markUnsubscribed(s);
-    setPending((p) => [...p, s]);
+    const scheduleUnsubscribe = async (s) => {
+
+      setPending((p) => [...p, s]);
     timers.current[s.from] = setTimeout(() => {
       delete timers.current[s.from];
       setPending((p) => p.filter((x) => x.from !== s.from));
-      handleUnsubscribe(s); // the real request happens here
+      handleUnsubscribe(s);
     }, UNDO_MS);
   };
 
@@ -174,7 +176,6 @@ export default function App() {
     delete timers.current[s.from];
     setPending((p) => p.filter((x) => x.from !== s.from));
 
-    await gmailApi.cancelUnsubscribe(s);
     setStatus(`Cancelled unsubscribe for ${s.from}`);
   };
 
@@ -201,7 +202,7 @@ export default function App() {
       
       {!isAuthenticated ? (
         <>
-          <Login onLogin={handleLogin} />
+          <Login onLogin={handleLogin} loading={loading} />
           {status && (
             <p role="alert" style={{ maxWidth: 420, margin: '16px auto', color: '#b45309' }}>
               {status}
