@@ -114,6 +114,11 @@ class GmailService {
     return !!this.#token;
   }
 
+    // Returns the current token for making external API calls like spam filters
+  getToken() {
+    return this.#token;
+  }
+
   // Private method to make requests to Gmail API with retry logic for rate limiting and token refresh
   async #request(path, options = {}) {
     if (!this.#token) throw new Error("Not authenticated with Gmail");
