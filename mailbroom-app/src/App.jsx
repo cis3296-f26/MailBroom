@@ -4,6 +4,7 @@ import { getSenderIdentity } from './senderIdentity';
 import { gmailApi } from './gmail.js';
 import RefreshLogo from '@components/RefreshLogo';
 import LogoutButton from '@components/LogoutButton';
+import mailbroomLogo from './assets/mailbroomlogo.png';
 import Login from './Login';
 import UndoPopup from './UndoPopup';
 import SenderCard from './SenderCard';
@@ -190,15 +191,17 @@ export default function App() {
 
     return (
     <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif', overflowX: 'hidden' }}>
-      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
-        <h1>MailBroom</h1>
+      <header className="app-header">
+        <h1 className="app-brand">
+          <img className="app-logo" src={mailbroomLogo} alt="MailBroom" width="2159" height="728" />
+        </h1>
         {isAuthenticated ? (
-          <>
+          <div className="app-header-actions">
             <RefreshLogo size={50} onRefresh={() => loadSenders()} />
             <LogoutButton onLogout={handleLogout} />
-          </>
+          </div>
         ) : null}
-      </div>
+      </header>
       
       {!isAuthenticated ? (
         <>
