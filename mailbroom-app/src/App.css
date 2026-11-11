@@ -1,3 +1,32 @@
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.app-brand {
+  flex: 0 1 420px;
+  min-width: 0;
+  margin: 0;
+  line-height: 1;
+}
+
+.app-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;
