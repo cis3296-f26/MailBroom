@@ -4,138 +4,16 @@ import { getSenderIdentity } from './senderIdentity';
 import { gmailApi } from './gmail.js';
 import RefreshLogo from '@components/RefreshLogo';
 import LogoutButton from '@components/LogoutButton';
+import Login from './Login';
+import UndoPopup from './UndoPopup';
+import SenderCard from './SenderCard';
+import { moveSenderToSpam } from './spamFilter';
 
 const UNDO_MS = 6000; // time for the user to undo an unsubscribe action
 const THRESHOLD = 110; // px of horizontal drag
 
-function SenderAvatar({ identity }) {
-  const [failed, setFailed] = useState(false);
 
-  return (
-    <div className="sender-avatar" aria-hidden="true">
-      {identity.iconUrl && !failed ? (
-        <img
-          src={identity.iconUrl}
-          alt=""
-          referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
-        />
-      ) : identity.initials}
-    </div>
-  );
-}
 
-function SenderCard({ senders, onDecision }) {
-  const [i, setI] = useState(0);
-  const sender = senders[i];
-
-  const drag = useRef({ active: false, startX: 0, dx: 0 });
-  const card = useRef(null);
-
-  const decide = (action) => {
-    onDecision?.(sender, action);
-    setI(n => n + 1);
-  };
-
-  // slide the card off screen in the chosen direction, then advance
-  const flyOut = (action) => {
-    const el = card.current;
-    if (!el) return decide(action);
-    const x = action === 'unsubscribe' ? -600 : 600;
-    el.style.transition = 'transform .3s ease, opacity .3s ease';
-    el.style.transform = `translate(${x}px, 40px) rotate(${x / 18}deg)`;
-    el.style.opacity = 0;
-    setTimeout(() => decide(action), 280);
-  };
-
-  const onPointerDown = (e) => {
-    drag.current = { active: true, startX: e.clientX, dx: 0 };
-    card.current.setPointerCapture(e.pointerId);   
-    card.current.style.transition = 'none';
-  };
-
-  const onPointerMove = (e) => {
-    if (!drag.current.active) return;
-    const dx = (drag.current.dx = e.clientX - drag.current.startX);
-    card.current.style.transform = `translate(${dx}px, 0) rotate(${dx / 18}deg)`;
-
-    // fade in whichever label matches the direction of travel
-    const strength = Math.min(Math.abs(dx) / THRESHOLD, 1);
-    card.current.querySelector('.verdict-no').style.opacity = dx < 0 ? strength : 0;
-    card.current.querySelector('.verdict-yes').style.opacity = dx > 0 ? strength : 0;
-  };
-
-  const onPointerUp = () => {
-    const { active, dx } = drag.current;
-    if (!active) return;
-    drag.current.active = false;
-
-    if (Math.abs(dx) > THRESHOLD) return flyOut(dx < 0 ? 'unsubscribe' : 'keep');
-
-    // if you didn't drag far enough then the card snaps back into place
-    card.current.style.transition = 'transform .3s ease';
-    card.current.style.transform = 'translate(0,0) rotate(0)';
-    card.current.querySelector('.verdict-no').style.opacity = 0;
-    card.current.querySelector('.verdict-yes').style.opacity = 0;
-  };
-
-  if (!sender) {
-    return <p className="card-done">All done. Reviewed {i} senders.</p>;
-  }
-
-  const identity = getSenderIdentity(sender.from);
-
-  return (
-    <>
-      <div className="card-progress">{i} of {senders.length} reviewed</div>
-
-      {/* Reset swipe styles when the sender changes */}
-      <div
-        key={sender.from}
-        ref={card}
-        className="card"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-      >
-        <div className="verdict verdict-no">UNSUBSCRIBE</div>
-        <div className="verdict verdict-yes">KEEP</div>
-
-        <div className="sender-heading">
-          <SenderAvatar key={sender.from} identity={identity} />
-          <div className="sender-details">
-            <div className="card-from">{identity.name}</div>
-            {identity.name !== identity.email && (
-              <div className="sender-email">{identity.email}</div>
-            )}
-          </div>
-        </div>
-        <div className="card-stats">
-          {sender.count} message{sender.count === 1 ? '' : 's'} · {sender.opened} opened
-        </div>
-        {sender.opened === 0 && <div className="card-never">never opened</div>}
-        {sender.latest && (
-          <div className="email-preview">
-            <div className="preview-label">Latest email</div>
-            <div className="preview-date">
-              {new Date(sender.latest.timestamp).toLocaleString(undefined, {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              })}
-            </div>
-            <div className="preview-subject">{sender.latest.subject}</div>
-            <p className="preview-snippet">{sender.latest.snippet}</p>
-          </div>
-        )}
-      </div>
-
-      <div className="card-buttons">
-        <button className="btn-unsub" onClick={() => flyOut('unsubscribe')}>Unsubscribe</button>
-        <button className="btn-keep" onClick={() => flyOut('keep')}>Keep</button>
-      </div>
-    </>
-  );
-}
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -264,22 +142,32 @@ export default function App() {
 
   const handleUnsubscribe = async (s) => {
     try {
-      const result = await gmailApi.unsubscribe(s);
-      setStatus(result.message || `Unsubscribed from ${s.from}`);
+      const result = await gmailApi.unsubscribe(s); // comment to test the spam filter
+      //const result = { ok: false, message: "Fake failure for testing" };
+      // ^==uncomment to test the spam filter ==^
+      
+      if (result.ok) {
+        setStatus(result.message || `Unsubscribed from ${s.from}`);
+      } else {
+        const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+        await moveSenderToSpam(gmailApi.getToken(), cleanEmail);
+        setStatus(`Unsubscribe failed. ${s.from} has been moved to spam.`);
+      }
     } catch (err) {
       console.error(err);
-      setStatus('Unsubscribe failed. Check the console.');
-      setFailed((f) => [...f, s.from]);
+      const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+      await moveSenderToSpam(gmailApi.getToken(), cleanEmail);
+      setStatus(`Unsubscribe failed. ${s.from} has been moved to spam.`);
     }
   };
+  
+    const scheduleUnsubscribe = async (s) => {
 
-  const scheduleUnsubscribe = async (s) => {
-    await gmailApi.markUnsubscribed(s);
-    setPending((p) => [...p, s]);
+      setPending((p) => [...p, s]);
     timers.current[s.from] = setTimeout(() => {
       delete timers.current[s.from];
       setPending((p) => p.filter((x) => x.from !== s.from));
-      handleUnsubscribe(s); // the real request happens here
+      handleUnsubscribe(s);
     }, UNDO_MS);
   };
 
@@ -288,7 +176,6 @@ export default function App() {
     delete timers.current[s.from];
     setPending((p) => p.filter((x) => x.from !== s.from));
 
-    await gmailApi.cancelUnsubscribe(s);
     setStatus(`Cancelled unsubscribe for ${s.from}`);
   };
 
@@ -301,7 +188,7 @@ export default function App() {
     }
   };
 
-  return (
+    return (
     <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif', overflowX: 'hidden' }}>
       <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
         <h1>MailBroom</h1>
@@ -314,17 +201,13 @@ export default function App() {
       </div>
       
       {!isAuthenticated ? (
-      <>
-      <button disabled={loading} onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
-        {loading ? 'Signing in...' : 'Login with Google'}
-      </button>
-
-      {status && (
-        <p role="alert" style={{ maxWidth: 420, margin: '16px auto', color: '#b45309' }}>
-          {status}
-        </p>
-      )}
-
+        <>
+          <Login onLogin={handleLogin} loading={loading} />
+          {status && (
+            <p role="alert" style={{ maxWidth: 420, margin: '16px auto', color: '#b45309' }}>
+              {status}
+            </p>
+          )}
           <p style={{ maxWidth: 420, margin: '16px auto', color: '#6b7280', fontSize: 14 }}>
             Google will warn that MailBroom is not verified. This is an expected warning...
             Please click "Advanced", then "Go to MailBroom (unsafe)" to continue.
@@ -341,16 +224,9 @@ export default function App() {
             </div>
           )}
           {status && <p>{status}</p>}
-
-          <div className="undo-container">
-            {pending.map((s) => (
-              <div key={s.from} className="undo-bar">
-                Unsubscribing from {s.from}...{' '}
-                <button onClick={() => undoUnsubscribe(s)}>Undo</button>
-              </div>
-            ))}
-          </div>
-
+          
+          <UndoPopup pending={pending} onUndo={undoUnsubscribe} />
+          
           {!loading && senders.length > 0 && (
             <SenderCard senders={senders} onDecision={handleDecision} />
           )}
