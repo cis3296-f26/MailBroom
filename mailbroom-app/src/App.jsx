@@ -7,6 +7,7 @@ import LogoutButton from '@components/LogoutButton';
 import Login from './Login';
 import UndoPopup from './UndoPopup';
 import SenderCard from './SenderCard';
+import { moveSenderToSpam } from './spamFilter';
 
 const UNDO_MS = 6000; // time for the user to undo an unsubscribe action
 const THRESHOLD = 110; // px of horizontal drag
@@ -141,15 +142,23 @@ export default function App() {
 
   const handleUnsubscribe = async (s) => {
     try {
-      const result = await gmailApi.unsubscribe(s);
-      setStatus(result.message || `Unsubscribed from ${s.from}`);
+      const result = await gmailApi.unsubscribe(s); 
+      
+      if (result.ok) {
+        setStatus(result.message || `Unsubscribed from ${s.from}`);
+      } else {
+        const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+        await moveSenderToSpam(gmailApi.getToken(), cleanEmail);
+        setStatus(`Unsubscribe failed. ${s.from} has been moved to spam.`);
+      }
     } catch (err) {
       console.error(err);
-      setStatus('Unsubscribe failed. Check the console.');
-      setFailed((f) => [...f, s.from]);
+      const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
+      await moveSenderToSpam(gmailApi.getToken(), cleanEmail);
+      setStatus(`Unsubscribe failed. ${s.from} has been moved to spam.`);
     }
   };
-
+  
   const scheduleUnsubscribe = async (s) => {
     await gmailApi.markUnsubscribed(s);
     setPending((p) => [...p, s]);

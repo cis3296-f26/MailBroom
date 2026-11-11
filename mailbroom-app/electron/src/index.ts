@@ -156,7 +156,7 @@ if (electronIsDev) {
         const authUrl = oAuth2Client.generateAuthUrl({
           access_type: 'offline',
           prompt: 'consent', // Ensures Google returns a refresh_token
-          scope: ['https://mail.google.com/']
+          scope: ['https://mail.google.com/', 'https://www.googleapis.com/auth/gmail.settings.basic'] as any
         });
 
         authWindow.loadURL(authUrl);
