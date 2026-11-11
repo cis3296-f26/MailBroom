@@ -311,7 +311,6 @@ class GmailService {
     if (!sender) throw new Error('No sender provided');
 
     const cleanEmail = cleanSenderEmail(sender.from);
-    await saveUnsubscribedEmail(cleanEmail);
 
     if (sender.https) {
       if (window.desktopAPI?.unsubscribe) {
@@ -323,6 +322,8 @@ class GmailService {
         if (!result.ok) {
           throw new Error(result.error || `HTTPS Unsubscribe Failed: ${result.status}`);
         }
+        await saveUnsubscribedEmail(cleanEmail);
+
         return {
           ok: true,
           type: 'https',
@@ -330,6 +331,8 @@ class GmailService {
         };
       } else {
         window.open(sender.https, '_blank');
+        await saveUnsubscribedEmail(cleanEmail);
+
         return {
           ok: true,
           type: 'https',
@@ -338,6 +341,8 @@ class GmailService {
       }
     } else if (sender.mailto) {
       await this.sendUnsubscribeEmail(sender.mailto);
+      await saveUnsubscribedEmail(cleanEmail);
+
       return {
         ok: true,
         type: 'mailto',
