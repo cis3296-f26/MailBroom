@@ -1,15 +1,20 @@
-/* RefreshButton.css */
-.broom-refresh {
+.refresh-button {
   background: transparent;
-  border: none;
-  padding: 0;
+  border: 1px solid #d9d1c4;
+  border-radius: 6px;
+  padding: 6px 14px;
+  color: #1b3e65;
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 36px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  outline: none;
 }
 
-.broom-refresh:not(:disabled):hover {
-  opacity: 0.7;
+.refresh-button:not(:disabled):hover {
+  background: #eee7db;
 }
+
+.refresh-button:disabled { opacity: .5; cursor: default; }
