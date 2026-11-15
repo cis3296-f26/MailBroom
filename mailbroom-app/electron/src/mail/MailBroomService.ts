@@ -15,7 +15,7 @@ export class MailBroomService {
      * Connects to IMAP, scans inbox, returns formatted candidates
      * @param {number} [limit=50] - Max number of candidates to return
      */
-    async getUnsubscribeCandidates(limit = 50) {
+    async getUnsubscribeCandidates(limit : number = 50) : Promise<UnsubscribeCandidate[]>{
         throw new Error("MailBroomService.getUnsubscribeCandidate() not implemented");
     }
 
@@ -24,7 +24,7 @@ export class MailBroomService {
      * @param {UnsubscribeCandidate} candidate
      * @returns {Promise<boolean>} - True if successful
      */
-    async processUnsubscribe(candidate: UnsubscribeCandidate) {
+    async processUnsubscribe(candidate: UnsubscribeCandidate) : Promise<boolean> {
         throw new Error("MailBroomService.processUnsubscribe() not implemented");
     }
 }
