@@ -146,7 +146,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none !important; }
-  .loading-broom-icon { animation: none; }
 }
 
 .history-page { display: flex; flex-direction: column; gap: 20px; padding-bottom: 12px; }
