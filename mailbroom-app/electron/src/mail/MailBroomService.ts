@@ -3,19 +3,19 @@ import { SmtpClient } from './SmtpClient';
 import { UnsubscribeCandidate } from './types';
 
 export class MailBroomService {
-    private imap: ImapClient;
-    private smtp: SmtpClient;
+  private imap: ImapClient;
+  private smtp: SmtpClient;
 
-    constructor(imapClient : ImapClient, smtpClient: SmtpClient) {
-        this.imap = imapClient;
-        this.smtp = smtpClient;
-    }
+  constructor(imapClient: ImapClient, smtpClient: SmtpClient) {
+    this.imap = imapClient;
+    this.smtp = smtpClient;
+  }
 
-    /**
-     * Connects to IMAP, scans inbox, returns formatted candidates
-     * @param {number} [limit=50] - Max number of candidates to return
-     */
-    async getUnsubscribeCandidates(limit : number = 50) : Promise<UnsubscribeCandidate[]>{
+  /**
+   * Connects to IMAP, scans inbox, returns formatted candidates
+   * @param {number} [limit=50] - Max number of candidates to return
+   */
+  async getUnsubscribeCandidates(limit: number = 50): Promise<UnsubscribeCandidate[]> {
     await this.imap.connect();
     const candidates: UnsubscribeCandidate[] = [];
 
@@ -48,12 +48,33 @@ export class MailBroomService {
     }
   }
 
-    /**
-     * Executes unsubscribe either via https or smtp
-     * @param {UnsubscribeCandidate} candidate
-     * @returns {Promise<boolean>} - True if successful
-     */
-    async processUnsubscribe(candidate: UnsubscribeCandidate) : Promise<boolean> {
-        throw new Error("MailBroomService.processUnsubscribe() not implemented");
+  /**
+   * Executes unsubscribe either via https or smtp
+   * @param {UnsubscribeCandidate} candidate
+   * @returns {Promise<boolean>} - True if successful
+   */
+  async processUnsubscribe(candidate: UnsubscribeCandidate): Promise<boolean> {
+    // Prioritize HTTPS unsubscribes
+    if (candidate.httpsUrl) {
+      try {
+        const response = await fetch(candidate.httpsUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'List-Unsubscribe=One-Click'
+        });
+
+        if (response.ok) return true;
+      } catch (error) {
+        console.error(`HTTPS Unsubscribe failed for ${candidate.httpsUrl}:`, error);
+      }
     }
+
+    //Fallback to mail unsubscribe
+    if (candidate.mailtoUrl) {
+      const cleanMailto = candidate.mailtoUrl.replace('mailto:', '').split('?')[0];
+      return await this.smtp.sendMail(cleanMailto, 'Unsubscribe', 'unsubscribe');
+    }
+
+    return false;
+  }
 }

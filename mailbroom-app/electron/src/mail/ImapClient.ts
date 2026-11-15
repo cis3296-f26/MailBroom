@@ -1,8 +1,10 @@
+import { ImapFlow, MailboxLockObject } from 'imapflow';
 import { ProviderConfig } from './types';
 
 export class ImapClient {
   private config: ProviderConfig;
-  private client: unknown | null; 
+  private client: ImapFlow;
+  private lock: MailboxLockObject | null = null;
 
   /**
    * Initializes the IMAP client with connection credentials.
@@ -10,14 +12,24 @@ export class ImapClient {
    */
   constructor(config: ProviderConfig) {
     this.config = config;
-    this.client = null;
+    this.client = new ImapFlow({
+      host: config.host,
+      port: config.port,
+      secure: true,
+      auth: {
+        user: config.user,
+        pass: config.pass
+      },
+      logger: false // Allows network debugging
+    });
   }
 
   /**
    * Opens the TCP connection and authenticates.
    */
   async connect(): Promise<void> {
-    throw new Error('ImapClient.connect() is not implemented yet.');
+    await this.client.connect();
+    this.lock = await this.client.getMailboxLock('INBOX'); //Lock for sequential fetches
   }
 
   /**
@@ -27,13 +39,29 @@ export class ImapClient {
    * @returns Raw envelope data from ImapFlow
    */
   async fetchHeaders(range: string, headers: string[]): Promise<any[]> {
-    throw new Error('ImapClient.fetchHeaders() is not implemented yet.');
+    const messages = [];
+
+    //Only fetch metadata and headers
+    const fetchOptions = {
+      envelope: true,
+      headers: headers
+    }
+
+    for await (const message of this.client.fetch(range, fetchOptions)) {
+      messages.push(message);
+    }
+
+    return messages;
   }
 
   /**
    * Releases locks and gracefully closes the connection.
    */
   async disconnect(): Promise<void> {
-    throw new Error('ImapClient.disconnect() is not implemented yet.');
+    if (this.lock) {
+      this.lock.release();
+      this.lock = null;
+    }
+    await this.client.logout();
   }
 }

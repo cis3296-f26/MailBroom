@@ -19,7 +19,7 @@ describe('MailBroomService', () => {
     service = new MailBroomService(mockImap, mockSmtp);
   });
 
-  test('connects, fetches nothing if inbox is empty, and disconnects safely', async () => {
+  test('connect, fetch nothing when inbox is empty, and disconnect', async () => {
     mockImap.fetchHeaders.mockResolvedValue([]);
 
     const results = await service.getUnsubscribeCandidates();
@@ -30,7 +30,7 @@ describe('MailBroomService', () => {
     expect(mockImap.disconnect).toHaveBeenCalledTimes(1);
   });
 
-  test('filters out emails that lack a list-unsubscribe header', async () => {
+  test('filter out emails that lack a list-unsubscribe header', async () => {
     // 1. Arrange: Provide one junk email and one valid promotional email
     mockImap.fetchHeaders.mockResolvedValue([
       { envelope: { from: [{ address: 'mom@gmail.com' }] }, headers: '' },
