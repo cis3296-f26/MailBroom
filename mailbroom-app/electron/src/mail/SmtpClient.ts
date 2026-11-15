@@ -6,15 +6,16 @@ export class SmtpClient {
   private userEmail: string;
 
   /**
-   * Initializes the IMAP client with connection credentials.
+   * Initializes the SMTP client with connection credentials.
    * @param config The provider configuration and user credentials
    */
   constructor(config: ProviderConfig) {
     this.userEmail = config.user;
+    const isGmail = !config.smtpHost || config.smtpHost === 'smtp.gmail.com';
     this.transporter = nodemailer.createTransport({
-      host: config.host,
-      port: config.port,
-      secure: true,
+      host: config.smtpHost || 'smtp.gmail.com',
+      port: config.smtpPort || (isGmail ? 465 : 587),
+      secure: config.secure !== false,
       auth: {
         user: config.user,
         pass: config.pass
@@ -22,7 +23,14 @@ export class SmtpClient {
     });
   }
 
-  async sendMail(to: string, body: string, subject: string) {
+  /**
+   * Sends an email via SMTP.
+   * @param to Recipient address
+   * @param body Email text content
+   * @param subject Email subject
+   * @returns True if the mail server accepted the message
+   */
+  async sendMail(to: string, body: string = 'unsubscribe', subject: string = 'unsubscribe'): Promise<boolean> {
     const info = await this.transporter.sendMail({
       from: this.userEmail,
       to: to,
@@ -30,8 +38,7 @@ export class SmtpClient {
       text: body,
     });
 
-    // Returns true if server accepts email
-    return info.accepted.length > 0;
+    // Returns true if server accepted the email
+    return (info.accepted && info.accepted.length > 0) || false;
   }
-
 }

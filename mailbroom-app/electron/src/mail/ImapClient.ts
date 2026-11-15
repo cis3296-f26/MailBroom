@@ -13,14 +13,14 @@ export class ImapClient {
   constructor(config: ProviderConfig) {
     this.config = config;
     this.client = new ImapFlow({
-      host: config.host,
-      port: config.port,
-      secure: true,
+      host: config.host || 'imap.gmail.com',
+      port: config.port || 993,
+      secure: config.secure !== false,
       auth: {
         user: config.user,
         pass: config.pass
       },
-      logger: false // Allows network debugging
+      logger: false // Set to true for network debugging if needed
     });
   }
 
@@ -29,25 +29,34 @@ export class ImapClient {
    */
   async connect(): Promise<void> {
     await this.client.connect();
-    this.lock = await this.client.getMailboxLock('INBOX'); //Lock for sequential fetches
+    this.lock = await this.client.getMailboxLock('INBOX'); // Lock for sequential fetches
   }
 
   /**
-   * Fetches headers for a specific range of emails.
-   * @param range Sequence range (e.g., "1:*")
-   * @param headers Array of headers to fetch (e.g., ['list-unsubscribe'])
-   * @returns Raw envelope data from ImapFlow
+   * Fetches headers and metadata for a range of emails.
+   * If range is '1:*' and mailbox has many emails, fetches the most recent slice.
+   * @param range Sequence range (defaults to recent window)
+   * @param headers Array of headers to fetch (e.g., ['list-unsubscribe', 'list-unsubscribe-post'])
+   * @returns Raw envelope and header data from ImapFlow
    */
-  async fetchHeaders(range: string, headers: string[]): Promise<any[]> {
+  async fetchHeaders(range: string = '1:*', headers: string[] = ['list-unsubscribe', 'list-unsubscribe-post']): Promise<any[]> {
     const messages = [];
 
-    //Only fetch metadata and headers
-    const fetchOptions = {
-      envelope: true,
-      headers: headers
+    let targetRange = range;
+    // If range is '1:*', prefer targeting the latest 150 emails to avoid scanning thousands of historical emails
+    const mailboxExists = (this.client.mailbox as any)?.exists;
+    if (range === '1:*' && typeof mailboxExists === 'number' && mailboxExists > 150) {
+      targetRange = `${Math.max(1, mailboxExists - 150)}:*`;
     }
 
-    for await (const message of this.client.fetch(range, fetchOptions)) {
+    const fetchOptions = {
+      envelope: true,
+      flags: true,
+      internalDate: true,
+      headers: headers
+    };
+
+    for await (const message of this.client.fetch(targetRange, fetchOptions)) {
       messages.push(message);
     }
 

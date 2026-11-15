@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import './App.css';
-import { gmailApi } from './gmail.js';
+import { mailService as gmailApi } from './mailService.js';
 import RefreshLogo from '@components/RefreshLogo';
 import LogoutButton from '@components/LogoutButton';
 import mailbroomLogo from './assets/mailbroomlogo.png';
@@ -133,9 +133,10 @@ export default function App() {
     const checkAutoLogin = async () => {
       setLoading(true);
       try {
-        const token = await gmailApi.authenticate(false);
-        if (token && isMounted) {
+        const creds = await gmailApi.getStoredCredentials();
+        if (creds && isMounted) {
           setIsAuthenticated(true);
+          setAccountEmail(creds.user || '');
           await loadSenders();
         }
       } catch (err) {
@@ -151,17 +152,23 @@ export default function App() {
     };
   }, [hasStarted]);
 
-  const handleLogin = async () => {
+  const handleLogin = async (credentials) => {
+    if (!credentials) {
+      setIsAuthenticated(false);
+      return;
+    }
     if (loginInFlight.current) return;
     loginInFlight.current = true;
     setLoading(true);
+    setStatus('');
     try {
-      await gmailApi.authenticate();
+      const creds = await gmailApi.authenticate(credentials);
       setIsAuthenticated(true);
+      setAccountEmail(creds?.user || credentials?.user || '');
       await loadSenders();
     } catch (error) {
       console.error('Login failed:', error);
-      setStatus("The sign in didn't complete. If this is your first time trying to use MailBroom, your Gmail address may not be approved for testing (yet)... Send it to the team and try again.");
+      setStatus(error?.message || "Sign in failed. Please check your App Password and try again.");
     } finally {
       loginInFlight.current = false;
       setLoading(false);
@@ -331,18 +338,14 @@ export default function App() {
       {!isAuthenticated ? (
         <section className="login-panel" aria-label="Connect your inbox">
           <h2>A little less inbox clutter.</h2>
-          <p className="login-intro">Review your senders, keep what you love, and sweep away the rest.</p>
+          <p className="login-intro">Sign in with an App Password to scan your inbox and sweep away promotional clutter.</p>
           <Login onLogin={handleLogin} loading={loading} />
-          {loading && <LoadingBroom message="Connecting to Google..." />}
+          {loading && <LoadingBroom message="Connecting to mail server..." />}
           {status && (
             <p role="alert" style={{ maxWidth: 420, margin: '16px auto', color: '#b45309' }}>
               {status}
             </p>
           )}
-          <p style={{ maxWidth: 420, margin: '16px auto', color: '#6b7280', fontSize: 14 }}>
-            Google will warn that MailBroom is not verified. This is an expected warning...
-            Please click "Advanced", then "Go to MailBroom (unsafe)" to continue.
-          </p>
         </section>
       ) : (
         <div className="review-session">
