@@ -3,7 +3,7 @@ export default function Login({ onLogin, loading }) {
     <button 
       disabled={loading} 
       onClick={onLogin} 
-      style={{ padding: '10px 20px', fontSize: '16px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}
+      className="login-button"
     >
       {loading ? 'Signing in...' : 'Login with Google'}
     </button>

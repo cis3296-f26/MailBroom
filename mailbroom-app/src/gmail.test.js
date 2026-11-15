@@ -98,3 +98,25 @@ test('a failed message is skipped and subsequent messages are still read', async
   }
   assert.equal(calls, 2);
 });
+
+test('Gmail scans stay fixed at 50 even with a previous custom session size', async () => {
+  const urls = [];
+  const service = await createService({ fetchImpl: async (url) => {
+    urls.push(new URL(url));
+    return response(200, { messages: [] });
+  } });
+  await service.loadSenders({ maxResults: 25 });
+  assert.equal(urls[0].searchParams.get('maxResults'), '50');
+  await service.fetchPromotions('category:promotions', undefined, 999);
+  assert.equal(urls[1].searchParams.get('maxResults'), '50');
+});
+
+test('account profile requests use their own cancellation signal', async () => {
+  const controller = new AbortController();
+  const service = await createService({ fetchImpl: async (url, options) => {
+    assert.equal(new URL(url).pathname, '/gmail/v1/users/me/profile');
+    assert.equal(options.signal, controller.signal);
+    return response(200, { emailAddress: 'test@example.com' });
+  } });
+  assert.deepEqual(await service.getProfile({ signal: controller.signal }), { emailAddress: 'test@example.com' });
+});

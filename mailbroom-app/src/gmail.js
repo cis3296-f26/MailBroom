@@ -183,6 +183,10 @@ class GmailService {
   }
 
   // Fetches a list of targeted messages from the user's inbox based on a search query
+  async getProfile({ signal } = {}) {
+    return this.#request('/profile', { signal });
+  }
+
   async fetchPromotions(query, onRetry) {
     const q = encodeURIComponent(query);
     return this.#request(`/messages?maxResults=50&labelIds=INBOX&q=${q}`, { onRetry });
