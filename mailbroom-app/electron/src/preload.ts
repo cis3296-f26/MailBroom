@@ -2,6 +2,8 @@ require('./rt/electron-rt');
 //////////////////////////////
 // User Defined Preload scripts below
 import { contextBridge, ipcRenderer } from 'electron';
+import { ProviderConfig, UnsubscribeCandidate } from './mail/types';
+
 
 contextBridge.exposeInMainWorld('desktopAPI', {
   loginWithGoogle: () => ipcRenderer.invoke('electron-google-login'),
@@ -9,6 +11,11 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   logout: () => ipcRenderer.invoke('electron-logout'),
   unsubscribe: (args: { url: string; oneClick: boolean }) =>
     ipcRenderer.invoke('unsubscribe-https', args),
+  fetchEmails: (config: ProviderConfig) => 
+    ipcRenderer.invoke('fetch-emails', config),
+    
+  sendUnsubscribe: (config: ProviderConfig, candidate: UnsubscribeCandidate) => 
+    ipcRenderer.invoke('send-unsubscribe', config, candidate)
 });
 
 console.log('User Preload!');

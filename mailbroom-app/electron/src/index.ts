@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { ElectronCapacitorApp, setupContentSecurityPolicy, setupReloadWatcher } from './setup';
+import { registerMailHandlers } from './mail/mailHandlers';
 
 const appPathCredentials = path.join(app.getAppPath(), 'credentials.json');
 const devPathCredentials = path.join(__dirname, '../../../credentials.json');

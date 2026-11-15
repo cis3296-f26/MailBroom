@@ -38,7 +38,7 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/nodemailer": "^8.0.2",
-    "electron": "^26.2.2",
+    "electron": "^45.3.2",
     "electron-builder": "~23.6.0",
     "electron-rebuild": "^3.2.9",
     "jest": "^30.5.2",
@@ -48,5 +48,10 @@
   "keywords": [
     "capacitor",
     "electron"
-  ]
+  ],
+  "allowScripts": {
+    "@parcel/watcher@2.6.0": true,
+    "electron@26.6.10": true,
+    "lzma-native@8.0.6": true
+  }
 }
