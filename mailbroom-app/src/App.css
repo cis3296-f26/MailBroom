@@ -141,12 +141,39 @@
 .undo-bar button { border: 0; background: transparent; color: #1b3e65; font-weight: 700; min-height: 44px; padding: 8px 12px; }
 
 @media (min-width: 600px) {
-  .app-shell { padding-top: 32px; padding-bottom: 20px; }
-  .bottom-nav { bottom: 16px; border-radius: 26px; }
+  .app-shell {
+    width: min(100%, 600px);
+    padding-top: 24px;
+    padding-bottom: calc(108px + env(safe-area-inset-bottom));
+  }
+
+  .card {
+    min-height: clamp(400px, calc(100svh - 240px), 560px);
+    padding-top: 24px;
+  }
+
+  .sender-avatar { width: 64px; height: 64px; font-size: 24px; }
+  .sender-avatar img { width: 48px; height: 48px; }
+  .sender-heading { gap: 12px; }
+  .card-from { font-size: 24px; }
+  .card-stats { margin-top: 16px; }
+  .email-preview { margin-top: 22px; padding-top: 20px; padding-bottom: 20px; }
+
+  .bottom-nav {
+    position: fixed;
+    left: 50%;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: min(calc(100% - 32px), 568px);
+    border-radius: 26px;
+  }
+
+  .welcome-page {
+    padding-bottom: max(32px, env(safe-area-inset-bottom));
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none !important; }
-  .loading-broom-icon { animation: none; }
 }
 
 .history-page { display: flex; flex-direction: column; gap: 20px; padding-bottom: 12px; }
