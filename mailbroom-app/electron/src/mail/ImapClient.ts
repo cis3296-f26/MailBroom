@@ -1,5 +1,6 @@
 import { ImapFlow, MailboxLockObject } from 'imapflow';
 import { ProviderConfig } from './types';
+import { resolveProvider, DEFAULT_PROVIDER } from './emailProviders';
 
 export class ImapClient {
   private config: ProviderConfig;
@@ -12,16 +13,29 @@ export class ImapClient {
    */
   constructor(config: ProviderConfig) {
     this.config = config;
+    const provider = resolveProvider(config.user);
+    const host = config.host || provider?.imap.host || DEFAULT_PROVIDER.imap.host;
+    const port = config.port || provider?.imap.port || DEFAULT_PROVIDER.imap.port;
+    const defaultSecure = port === 993 ? true : (provider?.imap.secure ?? (port === 993));
+    const secure = config.secure !== undefined ? config.secure : defaultSecure;
+
     this.client = new ImapFlow({
-      host: config.host || 'imap.gmail.com',
-      port: config.port || 993,
-      secure: config.secure !== false,
+      host: host,
+      port: port,
+      secure: secure,
       auth: {
         user: config.user,
         pass: config.pass
       },
       logger: false // Set to true for network debugging if needed
     });
+  }
+
+  /**
+   * Helper method to inspect client options (useful for testing and diagnostics).
+   */
+  getClientOptions(): any {
+    return (this.client as any).options;
   }
 
   /**

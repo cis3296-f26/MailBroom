@@ -1,5 +1,6 @@
 import * as nodemailer from 'nodemailer';
 import { ProviderConfig } from './types';
+import { resolveProvider, DEFAULT_PROVIDER } from './emailProviders';
 
 export class SmtpClient {
   private transporter: nodemailer.Transporter;
@@ -11,16 +12,36 @@ export class SmtpClient {
    */
   constructor(config: ProviderConfig) {
     this.userEmail = config.user;
-    const isGmail = !config.smtpHost || config.smtpHost === 'smtp.gmail.com';
+    const provider = resolveProvider(config.user);
+
+    // Derive host: explicit config, provider preset, IMAP host inference, or default provider preset
+    const derivedFromImap = config.host?.startsWith('imap.') ? config.host.replace(/^imap\./, 'smtp.') : config.host;
+    const host = config.smtpHost || provider?.smtp.host || derivedFromImap || DEFAULT_PROVIDER.smtp.host;
+
+    // Derive port: explicit config, provider preset, or default port
+    const defaultPort = provider?.smtp.port || (host === DEFAULT_PROVIDER.smtp.host ? DEFAULT_PROVIDER.smtp.port : 587);
+    const port = config.smtpPort || defaultPort;
+
+    // Derive secure mode: explicit config, provider preset, or port standard (465 = SSL vs 587 = STARTTLS)
+    const defaultSecure = provider?.smtp.secure !== undefined ? provider.smtp.secure : (port === 465);
+    const secure = config.secure !== undefined ? config.secure : defaultSecure;
+
     this.transporter = nodemailer.createTransport({
-      host: config.smtpHost || 'smtp.gmail.com',
-      port: config.smtpPort || (isGmail ? 465 : 587),
-      secure: config.secure !== false,
+      host: host,
+      port: port,
+      secure: secure,
       auth: {
         user: config.user,
         pass: config.pass
       }
     });
+  }
+
+  /**
+   * Helper method to inspect transport options (useful for testing and diagnostics).
+   */
+  getTransportOptions(): any {
+    return (this.transporter as any).options;
   }
 
   /**

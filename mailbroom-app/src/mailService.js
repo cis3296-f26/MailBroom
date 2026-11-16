@@ -49,6 +49,7 @@ class MailService {
       port: credentials.port ? Number(credentials.port) : undefined,
       smtpHost: credentials.smtpHost?.trim() || undefined,
       smtpPort: credentials.smtpPort ? Number(credentials.smtpPort) : undefined,
+      secure: credentials.secure !== undefined ? Boolean(credentials.secure) : undefined,
     };
 
     // Verify credentials against the IMAP server
@@ -93,6 +94,11 @@ class MailService {
 
   getUserEmail() {
     return this.#credentials?.user || '';
+  }
+
+  async getProfile() {
+    const creds = await this.getStoredCredentials();
+    return { emailAddress: creds?.user || this.getUserEmail() || '' };
   }
 
   getToken() {

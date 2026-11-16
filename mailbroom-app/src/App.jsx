@@ -168,7 +168,7 @@ export default function App() {
       await loadSenders();
     } catch (error) {
       console.error('Login failed:', error);
-      setStatus(error?.message || "Sign in failed. Please check your App Password and try again.");
+      setStatus("Sign in failed. Please check your App Password and try again.");
     } finally {
       loginInFlight.current = false;
       setLoading(false);
