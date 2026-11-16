@@ -125,6 +125,21 @@ export function registerMailHandlers(ipcMain: IpcMain) {
     clearEmailCredentials();
     return { ok: true };
   });
+
+  // External link handler
+  ipcMain.handle('open-external', async (_event, url: string) => {
+    try {
+      if (typeof url === 'string' && (url.startsWith('https:') || url.startsWith('http:') || url.startsWith('mailto:'))) {
+        const { shell } = await import('electron');
+        await shell.openExternal(url);
+        return { success: true };
+      }
+      return { success: false, error: 'Invalid URL scheme' };
+    } catch (err: any) {
+      console.error('Failed to open external link:', err);
+      return { success: false, error: err?.message || 'Failed to open link' };
+    }
+  });
 }
 
 // Backward-compatible alias

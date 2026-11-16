@@ -28,6 +28,10 @@ contextBridge.exposeInMainWorld('desktopAPI', {
     
   sendUnsubscribe: (config: ProviderConfig, candidate: UnsubscribeCandidate) => 
     ipcRenderer.invoke('send-unsubscribe', config, candidate),
+
+  // External browser navigation
+  openExternal: (url: string) => 
+    ipcRenderer.invoke('open-external', url),
 });
 
 console.log('MailBroom Desktop API loaded');
