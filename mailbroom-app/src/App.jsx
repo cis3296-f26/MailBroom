@@ -126,6 +126,8 @@ export default function App() {
     }
   };
 
+  const trashSenderMessages = (entry) => gmailApi.trashSenderMessages(entry.email);
+
   // Wait for the welcome screen before checking the saved session.
   useEffect(() => {
     if (!hasStarted) return;
@@ -326,7 +328,7 @@ export default function App() {
         setHistoryLoading(true);
         setHistoryError('');
         setHistoryRetry((value) => value + 1);
-      }} onHome={() => setActivePage('Home')} authenticated={isAuthenticated} />}
+      }} onHome={() => setActivePage('Home')} authenticated={isAuthenticated} onTrashSender={trashSenderMessages} />}
       <div id="home" hidden={activePage !== 'Home'}>
       {!isAuthenticated ? (
         <section className="login-panel" aria-label="Connect your inbox">

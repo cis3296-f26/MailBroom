@@ -192,6 +192,47 @@ class GmailService {
     return this.#request(`/messages?maxResults=50&labelIds=INBOX&q=${q}`, { onRetry });
   }
 
+  async trashSenderMessages(email) {
+    if (!/^[^@\s<>]+@[^@\s<>]+$/.test(email)) {
+      throw new Error('A valid sender email address is required.');
+    }
+
+    const messages = [];
+    let pageToken;
+    do {
+      const params = new URLSearchParams({
+        maxResults: '100',
+        q: `from:${email} in:inbox`,
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+
+      const page = await this.#request(`/messages?${params}`);
+      if (Array.isArray(page.messages)) messages.push(...page.messages);
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+
+    let trashed = 0;
+    let failed = 0;
+    for (const message of messages) {
+      if (!message.id) {
+        failed++;
+        continue;
+      }
+
+      try {
+        await this.#request(`/messages/${encodeURIComponent(message.id)}/trash`, {
+          method: 'POST',
+        });
+        trashed++;
+      } catch (err) {
+        if (this.isCancelled(err)) throw err;
+        failed++;
+      }
+    }
+
+    return { found: messages.length, trashed, failed };
+  }
+
   // Fetches detailed information for a list of messages, including headers and snippet
   async fetchMessageDetails(messages, { onRetry, onProgress } = {}) {
     const details = [];
