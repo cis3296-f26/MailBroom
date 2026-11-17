@@ -105,7 +105,7 @@ export class MailService {
     return this.#credentials?.pass || null;
   }
 
-  async loadSenders() {
+  async loadSenders(limit = 50) {
     this.beginLoading();
 
     const creds = await this.getStoredCredentials();
@@ -113,7 +113,7 @@ export class MailService {
       throw new Error('Please sign in with your email and App Password.');
     }
 
-    const res = await window.desktopAPI.fetchEmails(creds);
+    const res = await window.desktopAPI.fetchEmails(creds, limit);
     if (!res.success) {
       throw new Error(res.error || 'Failed to fetch emails.');
     }
@@ -121,13 +121,14 @@ export class MailService {
     if (!this.isActive) return [];
 
     const candidates = res.data || [];
+    const userEmail = this.#credentials?.user || creds.user;
 
     // Filter out senders that have already been unsubscribed or kept
     const filtered = [];
     for (const s of candidates) {
       if (!this.isActive) return [];
       const cleanEmail = cleanSenderEmail(s.from || s.email);
-      if (!(await isAlreadyUnsubscribed(cleanEmail)) && !(await isAlreadyKept(cleanEmail))) {
+      if (!(await isAlreadyUnsubscribed(userEmail, cleanEmail)) && !(await isAlreadyKept(userEmail, cleanEmail))) {
         filtered.push(s);
       }
     }
@@ -147,7 +148,7 @@ export class MailService {
       throw new Error(res.error || 'Failed to process unsubscribe');
     }
 
-    await saveUnsubscribedEmail(cleanEmail);
+    await saveUnsubscribedEmail(creds.user, cleanEmail);
 
     return {
       ok: true,
@@ -156,24 +157,30 @@ export class MailService {
   }
 
   async markUnsubscribed(senderOrEmail) {
+    const creds = await this.getStoredCredentials();
+    if (!creds) return;
     const email = typeof senderOrEmail === 'string'
       ? cleanSenderEmail(senderOrEmail)
       : cleanSenderEmail(senderOrEmail?.from || senderOrEmail?.email || '');
-    await saveUnsubscribedEmail(email);
+    await saveUnsubscribedEmail(creds.user, email);
   }
 
   async cancelUnsubscribe(senderOrEmail) {
+    const creds = await this.getStoredCredentials();
+    if (!creds) return;
     const email = typeof senderOrEmail === 'string'
       ? cleanSenderEmail(senderOrEmail)
       : cleanSenderEmail(senderOrEmail?.from || senderOrEmail?.email || '');
-    await removeUnsubscribedEmail(email);
+    await removeUnsubscribedEmail(creds.user, email);
   }
 
   async keepSender(senderOrEmail) {
+    const creds = await this.getStoredCredentials();
+    if (!creds) return;
     const email = typeof senderOrEmail === 'string'
       ? cleanSenderEmail(senderOrEmail)
       : cleanSenderEmail(senderOrEmail?.from || senderOrEmail?.email || '');
-    await saveKeptEmail(email);
+    await saveKeptEmail(creds.user, email);
   }
 
   async trashSenderMessages(senderEmail) {

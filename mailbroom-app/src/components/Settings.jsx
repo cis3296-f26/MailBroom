@@ -36,8 +36,10 @@ export default function Settings({ settings, ready, saving, message, error, onCh
             >
               <option value={50}>50 emails</option>
               <option value={100}>100 emails</option>
+              <option value={150}>150 emails</option>
               <option value={200}>200 emails</option>
-              <option value={500}>500 emails</option>
+              <option value={250}>250 emails</option>
+              <option value={300}>300 emails</option>
             </select>
           </div>
           <div className="setting-field">
