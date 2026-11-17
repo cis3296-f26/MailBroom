@@ -1,6 +1,6 @@
 import { ImapClient } from './ImapClient';
 import { SmtpClient } from './SmtpClient';
-import { UnsubscribeCandidate } from './types';
+import { Sender } from './types';
 
 export interface UnsubscribeResult {
   ok: boolean;
@@ -20,9 +20,9 @@ export class MailBroomService {
    * Connects to IMAP, scans inbox, aggregates candidates by sender, and returns formatted candidates.
    * @param {number} [limit=50] - Max number of candidate senders to return
    */
-  async getUnsubscribeCandidates(limit: number = 50): Promise<UnsubscribeCandidate[]> {
+  async getUnsubscribeCandidates(limit: number = 50): Promise<Sender[]> {
     await this.imap.connect();
-    const bySender = new Map<string, UnsubscribeCandidate>();
+    const bySender = new Map<string, Sender>();
 
     try {
       const messages = await this.imap.fetchHeaders('1:*', ['list-unsubscribe', 'list-unsubscribe-post']);
@@ -106,16 +106,16 @@ export class MailBroomService {
   }
 
   /**
-   * Executes unsubscribe via RFC 8058 One-Click HTTP POST or SMTP email.
+   * Executes unsubscribe via One-Click HTTP POST or SMTP email.
    * Defers manual web unsubscription (does not open external browser windows).
-   * @param {UnsubscribeCandidate} candidate
+   * @param {Sender} candidate
    * @returns {Promise<UnsubscribeResult>} - Result object indicating outcome
    */
-  async processUnsubscribe(candidate: UnsubscribeCandidate): Promise<UnsubscribeResult> {
+  async processUnsubscribe(candidate: Sender): Promise<UnsubscribeResult> {
     const httpsLink = candidate.https || candidate.httpsUrl;
     const mailtoLink = candidate.mailto || candidate.mailtoUrl;
 
-    // 1. Try automated RFC 8058 One-Click HTTP POST if supported
+    // Try automated One-Click HTTP POST if availible
     if (httpsLink && candidate.oneClick) {
       try {
         const response = await fetch(httpsLink, {
@@ -135,7 +135,7 @@ export class MailBroomService {
       }
     }
 
-    // 2. Fallback to automated mailto unsubscription via SMTP
+    // Fallback to automated mailto unsubscription via SMTP
     if (mailtoLink) {
       const cleanMailto = mailtoLink.replace(/^mailto:/i, '').split('?')[0];
       const sent = await this.smtp.sendMail(cleanMailto, 'unsubscribe', 'unsubscribe');
@@ -151,7 +151,7 @@ export class MailBroomService {
       };
     }
 
-    // 3. Web-only non-One-Click link: hold off on opening a new browser window
+    //Web-only non-One-Click link, deferred for later handling
     if (httpsLink) {
       return {
         ok: false,
@@ -163,5 +163,23 @@ export class MailBroomService {
       ok: false,
       message: `No unsubscribe link or email found for ${candidate.name || candidate.email}`,
     };
+  }
+
+  /**
+   * Deletes all messages found associated of an email
+   * @param {string} target email
+   * @return {Promise<number>} representing number of emails deleted, 0 if none or failed
+   */
+  async deleteSenderMessages(email: string): Promise<number>
+  {
+    await this.imap.connect();
+    
+    try {
+      return await this.imap.deleteMessagesBySender(email);
+    } finally {
+      await this.imap.disconnect();
+    }
+
+    return 0;
   }
 }

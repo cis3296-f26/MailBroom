@@ -162,10 +162,10 @@
 .history-filters button { min-height: 38px; padding: 8px; border: 0; border-radius: 999px; background: transparent; color: #63707b; font-size: 12px; }
 .history-filters button[aria-pressed="true"] { color: #fff; background: #1b3e65; }
 .history-list { display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; list-style: none; }
-.history-item { display: flex; align-items: center; gap: 14px; padding: 18px; border-radius: 24px; background: #fff; }
+.history-item { display: grid; grid-template-columns: 44px minmax(0, 1fr) 40px; align-items: center; gap: 14px; padding: 18px; border-radius: 24px; background: #fff; }
 .history-avatar { display: flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; border-radius: 12px; background: #f1f4f7; color: #1b3e65; font-size: 15px; font-weight: 600; overflow: hidden; }
 .history-avatar img { width: 32px; height: 32px; object-fit: contain; }
-.history-sender { min-width: 0; }
+.history-sender { grid-column: 2; min-width: 0; }
 .history-sender h3 { margin: 0; font-size: 14px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
 .history-sender p { margin-top: 3px; color: #63707b; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .history-badge { display: inline-block; margin-top: 8px; padding: 4px 9px; border-radius: 999px; font-size: 10px; line-height: 1.4; }

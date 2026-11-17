@@ -10,7 +10,7 @@ function cleanSenderEmail(from = '') {
   return from.match(/<([^>]+)>/)?.[1] || from;
 }
 
-class MailService {
+export class MailService {
   #credentials = null;
   #controller = null;
 
@@ -174,6 +174,25 @@ class MailService {
       ? cleanSenderEmail(senderOrEmail)
       : cleanSenderEmail(senderOrEmail?.from || senderOrEmail?.email || '');
     await saveKeptEmail(email);
+  }
+
+  async trashSenderMessages(senderEmail) {
+    if (!/^[^@\s<>]+@[^@\s<>]+$/.test(senderEmail)) {
+      throw new Error('A valid sender email address is required.');
+    }
+    
+    const creds = await this.getStoredCredentials();
+    if (!creds) throw new Error('Not signed in');
+
+    const res = await window.desktopAPI.deleteMessages(creds, cleanSenderEmail(senderEmail));
+    
+    if (!res.success) throw new Error(res.error || 'Failed to delete messages');
+
+    return {
+      found: res.count,
+      trashed: res.count,
+      failed: 0
+    };
   }
 }
 

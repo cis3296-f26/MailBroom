@@ -4,7 +4,7 @@ import * as path from 'path';
 import { ImapClient } from './ImapClient';
 import { SmtpClient } from './SmtpClient';
 import { MailBroomService } from './MailBroomService';
-import { ProviderConfig, UnsubscribeCandidate } from './types';
+import { ProviderConfig, Sender } from './types';
 
 // Encrypted Credential Storage using safeStorage (DPAPI / Keychain)
 const CREDENTIALS_FILE_NAME = 'email-credentials.enc';
@@ -90,7 +90,7 @@ export function registerMailHandlers(ipcMain: IpcMain) {
   });
 
   // Execute unsubscribe (automated One-Click POST or SMTP email; defers non-one-click web popups)
-  ipcMain.handle('send-unsubscribe', async (_event, config: ProviderConfig, candidate: UnsubscribeCandidate) => {
+  ipcMain.handle('send-unsubscribe', async (_event, config: ProviderConfig, candidate: Sender) => {
     try {
       const imap = new ImapClient(config);
       const smtp = new SmtpClient(config);
@@ -101,6 +101,20 @@ export function registerMailHandlers(ipcMain: IpcMain) {
     } catch (error: any) {
       console.error('Failed to process unsubscribe:', error);
       return { success: false, error: error?.message || 'Unsubscribe action failed' };
+    }
+  });
+
+  ipcMain.handle('delete-messages', async (event, config: ProviderConfig, senderEmail: string) => {
+    try {
+      const imap = new ImapClient(config);
+      const smtp = new SmtpClient(config);
+      const service = new MailBroomService(imap, smtp);
+      
+      const deletedCount = await service.deleteSenderMessages(senderEmail);
+      return { success: true, count: deletedCount };
+    } catch (error: any) {
+      console.error('Failed to delete messages:', error);
+      return { success: false, error: error.message };
     }
   });
 

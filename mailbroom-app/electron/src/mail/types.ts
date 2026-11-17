@@ -8,7 +8,7 @@ export interface ProviderConfig {
   secure?: boolean;
 }
 
-export interface UnsubscribeCandidate {
+export interface Sender {
   email: string; // Sender's email address
   name: string; // Sender's display name
   from: string; // Formatted "Name <email>" string

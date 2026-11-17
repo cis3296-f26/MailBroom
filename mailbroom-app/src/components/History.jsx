@@ -1,12 +1,42 @@
 import { useState } from 'react';
 import { getSenderIdentity } from '../senderIdentity';
 import { summarizeHistory } from '../history';
+import trashIcon from '../assets/trash_icon.png';
+import './HistoryTrash.css';
 
 const labels = { kept: 'Kept', requested: 'Unsubscribe requested', filtered: 'Filtered from inbox' };
 
-function HistoryItem({ entry }) {
+function HistoryItem({ entry, onTrashSender }) {
   const identity = getSenderIdentity(entry.from);
   const [failed, setFailed] = useState(false);
+  const [confirmingTrash, setConfirmingTrash] = useState(false);
+  const [trashing, setTrashing] = useState(false);
+  const [trashMessage, setTrashMessage] = useState('');
+  const [trashError, setTrashError] = useState('');
+
+  const trashMessages = async () => {
+    setConfirmingTrash(false);
+    setTrashing(true);
+    setTrashMessage('');
+    setTrashError('');
+    try {
+      const result = await onTrashSender(entry);
+      if (result.found === 0) {
+        setTrashMessage('No matching inbox messages were found.');
+      } else if (result.failed > 0) {
+        setTrashMessage(`Moved ${result.trashed} of ${result.found} messages to Trash; ${result.failed} could not be moved.`);
+      } else {
+        setTrashMessage(`Moved ${result.trashed} message${result.trashed === 1 ? '' : 's'} to Trash.`);
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        setTrashError(error?.message || 'Could not move messages to Trash. Please try again.');
+      }
+    } finally {
+      setTrashing(false);
+    }
+  };
+
   return (
     <li className="history-item">
       <div className="history-avatar" aria-hidden="true">
@@ -19,11 +49,45 @@ function HistoryItem({ entry }) {
         <p>{identity.email}</p>
         <span className={`history-badge ${entry.outcome === 'kept' ? 'is-kept' : 'is-removed'}`}>{labels[entry.outcome]}</span>
       </div>
+      {entry.outcome !== 'kept' && (
+        <>
+          <div className="history-trash-action">
+            {!confirmingTrash && (
+              <button
+                className="history-trash-button"
+                type="button"
+                aria-label={`Trash inbox messages from ${identity.email}`}
+                title="Trash inbox messages"
+                disabled={trashing}
+                onClick={() => {
+                  setTrashMessage('');
+                  setTrashError('');
+                  setConfirmingTrash(true);
+                }}
+              >
+                <img src={trashIcon} alt="" />
+              </button>
+            )}
+          </div>
+          {confirmingTrash && (
+            <div className="history-trash-confirm" role="group" aria-label={`Confirm moving messages from ${identity.email} to Trash`}>
+              <p>Move all inbox messages from {identity.email} to Gmail Trash?</p>
+              <div className="history-trash-confirm-actions">
+                <button type="button" disabled={trashing} onClick={trashMessages}>Move to Trash</button>
+                <button type="button" disabled={trashing} onClick={() => setConfirmingTrash(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {trashing && <p className="history-trash-progress" role="status">Moving to Trash…</p>}
+          {trashMessage && <p className="history-trash-result" role="status">{trashMessage}</p>}
+          {trashError && <p className="history-trash-result" role="alert">{trashError}</p>}
+        </>
+      )}
     </li>
   );
 }
 
-export default function History({ entries, loading, error, onRetry, onHome, authenticated }) {
+export default function History({ entries, loading, error, onRetry, onHome, authenticated, onTrashSender }) {
   const [filter, setFilter] = useState('all');
   const summary = summarizeHistory(entries, filter);
   return (
@@ -44,7 +108,7 @@ export default function History({ entries, loading, error, onRetry, onHome, auth
             {['all', 'kept', 'removed'].map((value) => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? 'All' : value === 'kept' ? 'Kept' : 'Removed'}</button>)}
           </div>
           {summary.entries.length ? (
-            <ul className="history-list">{summary.entries.map((entry) => <HistoryItem key={entry.email} entry={entry} />)}</ul>
+            <ul className="history-list">{summary.entries.map((entry) => <HistoryItem key={entry.email} entry={entry} onTrashSender={onTrashSender} />)}</ul>
           ) : (
             <div className="history-empty"><h2>{entries.length ? `No ${filter} senders yet` : 'A fresh start'}</h2><p>{entries.length ? 'Try another filter to see your reviewed senders.' : 'Your decisions will appear here as you clean your inbox.'}</p>{!entries.length && <button className="login-button" onClick={onHome}>Start reviewing</button>}</div>
           )}

@@ -2,7 +2,7 @@ require('./rt/electron-rt');
 //////////////////////////////
 // User Defined Preload scripts below
 import { contextBridge, ipcRenderer } from 'electron';
-import { ProviderConfig, UnsubscribeCandidate } from './mail/types';
+import { ProviderConfig, Sender } from './mail/types';
 
 contextBridge.exposeInMainWorld('desktopAPI', {
   // Credential management via safeStorage
@@ -26,8 +26,11 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   fetchEmails: (config: ProviderConfig) => 
     ipcRenderer.invoke('fetch-emails', config),
     
-  sendUnsubscribe: (config: ProviderConfig, candidate: UnsubscribeCandidate) => 
+  sendUnsubscribe: (config: ProviderConfig, candidate: Sender) => 
     ipcRenderer.invoke('send-unsubscribe', config, candidate),
+
+  deleteMessages: (config: ProviderConfig, senderEmail: string) => 
+    ipcRenderer.invoke('delete-messages', config, senderEmail),
 
   // External browser navigation
   openExternal: (url: string) => 
