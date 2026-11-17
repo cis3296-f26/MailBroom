@@ -5,7 +5,7 @@ export const SWIPE_PREFERENCES = ['swipe', 'buttons', 'both'];
 
 export function normalizeSettings(value = {}) {
   return {
-    emailsPerSession: DEFAULT_SETTINGS.emailsPerSession,
+    emailsPerSession: value?.emailsPerSession ? Number(value.emailsPerSession) : DEFAULT_SETTINGS.emailsPerSession,
     swipePreference: SWIPE_PREFERENCES.includes(value?.swipePreference) ? value.swipePreference : DEFAULT_SETTINGS.swipePreference,
   };
 }

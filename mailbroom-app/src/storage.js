@@ -10,24 +10,27 @@ export function createEmailStorage(preferences = Preferences) {
     await preferences.set({ key, value: JSON.stringify(emails) });
   }
 
-  async function saveEmail(key, email) {
-    const saved = await readList(key);
+  async function saveEmail(key, userEmail, email) {
+    const finalKey = `${key}_${userEmail}`;
+    const saved = await readList(finalKey);
     if (!saved.includes(email)) {
       saved.push(email);
-      await writeList(key, saved);
+      await writeList(finalKey, saved);
     }
   }
 
   return {
-    saveUnsubscribedEmail: (email) => saveEmail('unsubscribedEmails', email),
-    isAlreadyUnsubscribed: async (email) =>
-      (await readList('unsubscribedEmails')).includes(email),
-    removeUnsubscribedEmail: async (email) => {
-      const saved = await readList('unsubscribedEmails');
-      await writeList('unsubscribedEmails', saved.filter((item) => item !== email));
+    saveUnsubscribedEmail: (userEmail, email) => saveEmail('unsubscribedEmails', userEmail, email),
+    isAlreadyUnsubscribed: async (userEmail, email) =>
+      (await readList(`unsubscribedEmails_${userEmail}`)).includes(email),
+    removeUnsubscribedEmail: async (userEmail, email) => {
+      const finalKey = `unsubscribedEmails_${userEmail}`;
+      const saved = await readList(finalKey);
+      await writeList(finalKey, saved.filter((item) => item !== email));
     },
-    saveKeptEmail: (email) => saveEmail('keptEmails', email),
-    isAlreadyKept: async (email) => (await readList('keptEmails')).includes(email),
+    saveKeptEmail: (userEmail, email) => saveEmail('keptEmails', userEmail, email),
+    isAlreadyKept: async (userEmail, email) => 
+      (await readList(`keptEmails_${userEmail}`)).includes(email),
   };
 }
 
