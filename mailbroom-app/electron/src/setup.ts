@@ -6,7 +6,7 @@ import {
 } from '@capacitor-community/electron';
 import chokidar from 'chokidar';
 import type { MenuItemConstructorOptions } from 'electron';
-import { app, BrowserWindow, Menu, MenuItem, nativeImage, Tray, session } from 'electron';
+import { app, BrowserWindow, Menu, MenuItem, nativeImage, Tray, session, shell } from 'electron';
 import electronIsDev from 'electron-is-dev';
 import electronServe from 'electron-serve';
 import windowStateKeeper from 'electron-window-state';
@@ -181,17 +181,23 @@ export class ElectronCapacitorApp {
       this.loadMainWindow(this);
     }
 
-    // Security
+    // Security: Intercept external navigation and open in user's default browser
     this.MainWindow.webContents.setWindowOpenHandler((details) => {
       if (!details.url.includes(this.customScheme)) {
+        if (details.url.startsWith('https:') || details.url.startsWith('http:') || details.url.startsWith('mailto:')) {
+          shell.openExternal(details.url);
+        }
         return { action: 'deny' };
       } else {
         return { action: 'allow' };
       }
     });
-    this.MainWindow.webContents.on('will-navigate', (event, _newURL) => {
-      if (!this.MainWindow.webContents.getURL().includes(this.customScheme)) {
+    this.MainWindow.webContents.on('will-navigate', (event, newURL) => {
+      if (!newURL.startsWith(`${this.customScheme}://`)) {
         event.preventDefault();
+        if (newURL.startsWith('https:') || newURL.startsWith('http:') || newURL.startsWith('mailto:')) {
+          shell.openExternal(newURL);
+        }
       }
     });
 

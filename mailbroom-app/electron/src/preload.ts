@@ -2,13 +2,39 @@ require('./rt/electron-rt');
 //////////////////////////////
 // User Defined Preload scripts below
 import { contextBridge, ipcRenderer } from 'electron';
+import { ProviderConfig, Sender } from './mail/types';
 
 contextBridge.exposeInMainWorld('desktopAPI', {
-  loginWithGoogle: () => ipcRenderer.invoke('electron-google-login'),
-  getStoredAccessToken: () => ipcRenderer.invoke('electron-get-access-token'),
-  logout: () => ipcRenderer.invoke('electron-logout'),
-  unsubscribe: (args: { url: string; oneClick: boolean }) =>
-    ipcRenderer.invoke('unsubscribe-https', args),
+  // Credential management via safeStorage
+  saveCredentials: (config: ProviderConfig) => 
+    ipcRenderer.invoke('email-save-credentials', config),
+
+  getStoredCredentials: () => 
+    ipcRenderer.invoke('email-load-credentials'),
+
+  clearCredentials: () => 
+    ipcRenderer.invoke('email-clear-credentials'),
+
+  logout: () => 
+    ipcRenderer.invoke('electron-logout'),
+
+  // Connection testing
+  verifyCredentials: (config: ProviderConfig) =>
+    ipcRenderer.invoke('verify-credentials', config),
+
+  // Email fetching & unsubscription
+  fetchEmails: (config: ProviderConfig) => 
+    ipcRenderer.invoke('fetch-emails', config),
+    
+  sendUnsubscribe: (config: ProviderConfig, candidate: Sender) => 
+    ipcRenderer.invoke('send-unsubscribe', config, candidate),
+
+  deleteMessages: (config: ProviderConfig, senderEmail: string) => 
+    ipcRenderer.invoke('delete-messages', config, senderEmail),
+
+  // External browser navigation
+  openExternal: (url: string) => 
+    ipcRenderer.invoke('open-external', url),
 });
 
-console.log('User Preload!');
+console.log('MailBroom Desktop API loaded');
