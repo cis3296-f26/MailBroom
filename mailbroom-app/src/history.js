@@ -37,6 +37,19 @@ export function createReviewHistory(preferences = Preferences) {
       writes = task.catch(() => {});
       return task;
     },
+    remove(email) {
+      const normalizedEmail = email.toLowerCase();
+      const task = writes.then(async () => {
+        const entries = await read();
+        const next = entries.filter((entry) => entry.email.toLowerCase() !== normalizedEmail);
+        if (next.length !== entries.length) {
+          await preferences.set({ key: 'reviewHistory', value: JSON.stringify(next) });
+        }
+        return next;
+      });
+      writes = task.catch(() => {});
+      return task;
+    },
   };
 }
 
