@@ -1,0 +1,74 @@
+.history-trash-action {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.history-trash-button,
+.history-trash-confirm button {
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid #d5a5a5;
+  border-radius: 999px;
+  background: #fff;
+  color: #8d2938;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.history-trash-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 8px;
+}
+
+.history-trash-button img {
+  display: block;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.history-trash-button:disabled,
+.history-trash-confirm button:disabled {
+  opacity: .6;
+}
+
+.history-trash-confirm {
+  grid-column: 1 / -1;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff4f4;
+}
+
+.history-trash-confirm p,
+.history-trash-result {
+  margin: 0 0 8px;
+  color: #71343a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.history-trash-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.history-trash-confirm-actions button:first-child {
+  border-color: #8d2938;
+  background: #8d2938;
+  color: #fff;
+}
+
+.history-trash-result,
+.history-trash-progress {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #71343a;
+  font-size: 12px;
+  line-height: 1.5;
+}

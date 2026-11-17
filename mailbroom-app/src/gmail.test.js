@@ -120,3 +120,70 @@ test('account profile requests use their own cancellation signal', async () => {
   } });
   assert.deepEqual(await service.getProfile({ signal: controller.signal }), { emailAddress: 'test@example.com' });
 });
+
+test('trashes messages from all pages of a sender inbox search', async () => {
+  const requests = [];
+  const service = await createService({ fetchImpl: async (url, options) => {
+    const parsedUrl = new URL(url);
+    requests.push({ url: parsedUrl, options });
+
+    if (parsedUrl.pathname.endsWith('/messages') && options.method === 'GET') {
+      return parsedUrl.searchParams.has('pageToken')
+        ? response(200, { messages: [{ id: 'message-2' }] })
+        : response(200, { messages: [{ id: 'message-1' }], nextPageToken: 'next-page' });
+    }
+    return response(200, { id: parsedUrl.pathname.split('/').at(-2) });
+  } });
+
+  assert.deepEqual(await service.trashSenderMessages('news@example.com'), {
+    found: 2,
+    trashed: 2,
+    failed: 0,
+  });
+  const listRequests = requests.filter(({ url }) => url.pathname.endsWith('/messages'));
+  assert.equal(listRequests.length, 2);
+  assert.equal(listRequests[0].url.searchParams.get('q'), 'from:news@example.com in:inbox');
+  assert.equal(listRequests[1].url.searchParams.get('pageToken'), 'next-page');
+  const trashRequests = requests.filter(({ url }) => url.pathname.endsWith('/trash'));
+  assert.deepEqual(trashRequests.map(({ options }) => options.method), ['POST', 'POST']);
+});
+
+test('reports partial failures when some messages cannot be moved to Trash', async () => {
+  const trashedIds = [];
+  const service = await createService({ fetchImpl: async (url, options) => {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.pathname.endsWith('/messages') && options.method === 'GET') {
+      return response(200, { messages: [{ id: 'message-1' }, { id: 'message-2' }] });
+    }
+    if (parsedUrl.pathname.endsWith('/message-2/trash')) {
+      return {
+        ...response(403, { error: { message: 'Forbidden' } }),
+        ok: false,
+      };
+    }
+    trashedIds.push(parsedUrl.pathname);
+    return response(200, { id: 'message-1' });
+  } });
+
+  assert.deepEqual(await service.trashSenderMessages('news@example.com'), {
+    found: 2,
+    trashed: 1,
+    failed: 1,
+  });
+  assert.equal(trashedIds.length, 1);
+});
+
+test('does not trash anything when the sender has no inbox messages', async () => {
+  let calls = 0;
+  const service = await createService({ fetchImpl: async () => {
+    calls++;
+    return response(200, {});
+  } });
+
+  assert.deepEqual(await service.trashSenderMessages('news@example.com'), {
+    found: 0,
+    trashed: 0,
+    failed: 0,
+  });
+  assert.equal(calls, 1);
+});
