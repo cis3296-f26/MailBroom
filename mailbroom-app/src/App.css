@@ -136,6 +136,8 @@
 .verdict { position: absolute; top: 20px; z-index: 1; font-size: 16px; font-weight: 700; padding: 6px 10px; border: 2px solid currentColor; border-radius: 8px; opacity: 0; pointer-events: none; background: #fff; }
 .verdict-no { left: 12px; color: #cc254c; transform: rotate(-12deg); }
 .verdict-yes { right: 12px; color: #25854a; transform: rotate(12deg); }
+.undo-container { position: fixed; bottom: calc(94px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 20; width: min(440px, calc(100% - 32px)); pointer-events: none; }
+.undo-bar { padding: 14px; border: 1px solid #e3ca91; border-radius: 16px; background: #fff8e7; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; box-shadow: 0 4px 16px #182a3b14; pointer-events: auto; }
 .undo-container { position: fixed; bottom: calc(94px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 20; width: min(440px, calc(100% - 32px)); }
 .undo-bar { padding: 14px; border: 1px solid #e3ca91; border-radius: 16px; background: #fff8e7; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; box-shadow: 0 4px 16px #182a3b14; }
 .undo-bar button { border: 0; background: transparent; color: #1b3e65; font-weight: 700; min-height: 44px; padding: 8px 12px; }
@@ -210,3 +212,5 @@
 .verdict-yes { color: #25854a; }
 .verdict-left { left: 12px; right: auto; transform: rotate(-12deg); }
 .verdict-right { right: 12px; left: auto; transform: rotate(12deg); }
+
+.done-count { margin-top: 8px; color: #1b3e65; font-weight: 600; }
