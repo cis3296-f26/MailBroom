@@ -37,6 +37,21 @@ test('concurrent review decisions are saved without losing senders, newest first
   assert.equal(summarizeHistory([], 'all').reviewed, 0);
 });
 
+test('removing a history entry persists and leaves other senders intact', async () => {
+  const preferences = memoryPreferences();
+  const history = createReviewHistory(preferences);
+  await history.save({ from: 'a@example.com' }, 'requested');
+  await history.save({ from: 'b@example.com' }, 'kept');
+
+  const entries = await history.remove('A@example.com');
+
+  assert.deepEqual(entries.map((entry) => entry.email), ['b@example.com']);
+  assert.deepEqual(
+    (await createReviewHistory(preferences).read()).map((entry) => entry.email),
+    ['b@example.com']
+  );
+});
+
 test('a failed history save does not prevent later saves', async () => {
   const preferences = memoryPreferences();
   const set = preferences.set;

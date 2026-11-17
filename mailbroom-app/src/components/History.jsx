@@ -11,6 +11,7 @@ function HistoryItem({ entry, onTrashSender }) {
   const [failed, setFailed] = useState(false);
   const [confirmingTrash, setConfirmingTrash] = useState(false);
   const [trashing, setTrashing] = useState(false);
+  const [trashComplete, setTrashComplete] = useState(false);
   const [trashMessage, setTrashMessage] = useState('');
   const [trashError, setTrashError] = useState('');
 
@@ -21,6 +22,7 @@ function HistoryItem({ entry, onTrashSender }) {
     setTrashError('');
     try {
       const result = await onTrashSender(entry);
+      if (result.found === 0 || result.failed === 0) setTrashComplete(true);
       if (result.found === 0) {
         setTrashMessage('No matching inbox messages were found.');
       } else if (result.failed > 0) {
@@ -52,7 +54,7 @@ function HistoryItem({ entry, onTrashSender }) {
       {entry.outcome !== 'kept' && (
         <>
           <div className="history-trash-action">
-            {!confirmingTrash && (
+            {!confirmingTrash && !trashComplete && (
               <button
                 className="history-trash-button"
                 type="button"

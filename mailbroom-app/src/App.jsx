@@ -126,7 +126,15 @@ export default function App() {
     }
   };
 
-  const trashSenderMessages = (entry) => gmailApi.trashSenderMessages(entry.email);
+  const trashSenderMessages = async (entry) => {
+    const result = await gmailApi.trashSenderMessages(entry.email);
+    if (result.failed === 0) {
+      const entries = await reviewHistory.remove(entry.email);
+      historyRevision.current += 1;
+      setHistoryEntries(entries);
+    }
+    return result;
+  };
 
   // Wait for the welcome screen before checking the saved session.
   useEffect(() => {
