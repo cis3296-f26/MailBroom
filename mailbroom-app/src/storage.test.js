@@ -16,19 +16,21 @@ function createMemoryPreferences() {
 
 test('unsubscribed addresses can be saved once and removed', async () => {
   const storage = createEmailStorage(createMemoryPreferences());
+  const testUser = 'user@gmail.com'; // Define a test user
 
-  await storage.saveUnsubscribedEmail('news@example.com');
-  await storage.saveUnsubscribedEmail('news@example.com');
-  assert.equal(await storage.isAlreadyUnsubscribed('news@example.com'), true);
+  await storage.saveUnsubscribedEmail(testUser, 'news@example.com');
+  await storage.saveUnsubscribedEmail(testUser, 'news@example.com'); // Save again to test deduplication
+  assert.equal(await storage.isAlreadyUnsubscribed(testUser, 'news@example.com'), true);
 
-  await storage.removeUnsubscribedEmail('news@example.com');
-  assert.equal(await storage.isAlreadyUnsubscribed('news@example.com'), false);
+  await storage.removeUnsubscribedEmail(testUser, 'news@example.com');
+  assert.equal(await storage.isAlreadyUnsubscribed(testUser, 'news@example.com'), false);
 });
 
 test('kept addresses are stored separately from unsubscribed addresses', async () => {
   const storage = createEmailStorage(createMemoryPreferences());
+  const testUser = 'user@gmail.com'; // Define a test user
 
-  await storage.saveKeptEmail('news@example.com');
-  assert.equal(await storage.isAlreadyKept('news@example.com'), true);
-  assert.equal(await storage.isAlreadyUnsubscribed('news@example.com'), false);
+  await storage.saveKeptEmail(testUser, 'news@example.com');
+  assert.equal(await storage.isAlreadyKept(testUser, 'news@example.com'), true);
+  assert.equal(await storage.isAlreadyUnsubscribed(testUser, 'news@example.com'), false);
 });
