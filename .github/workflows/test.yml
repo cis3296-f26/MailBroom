@@ -34,7 +34,12 @@ jobs:
           cd mailbroom-app/electron
           npm ci
 
-      - name: Run Tests
+      - name: Run Frontend Tests
         run: |
           cd mailbroom-app
+          npm test
+
+      - name: Run Electron Jest Tests
+        run: |
+          cd mailbroom-app/electron
           npm test

@@ -73,7 +73,7 @@ function HistoryItem({ entry, onTrashSender }) {
           </div>
           {confirmingTrash && (
             <div className="history-trash-confirm" role="group" aria-label={`Confirm moving messages from ${identity.email} to Trash`}>
-              <p>Move all inbox messages from {identity.email} to Gmail Trash?</p>
+              <p>Move all inbox messages from {identity.email} to Trash?</p>
               <div className="history-trash-confirm-actions">
                 <button type="button" disabled={trashing} onClick={trashMessages}>Move to Trash</button>
                 <button type="button" disabled={trashing} onClick={() => setConfirmingTrash(false)}>Cancel</button>

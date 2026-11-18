@@ -12,6 +12,7 @@
     "resolveJsonModule": true,
     "typeRoots": ["./node_modules/@types"],
     "allowJs": true,
-    "rootDir": "."
+    "rootDir": ".",
+    "types": ["node", "jest"]
   }
 }

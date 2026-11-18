@@ -20,7 +20,8 @@
     "electron:make": "npm run build && electron-builder build -p never",
     "electron:portableWin": "npm run build && electron-builder build --win portable -p never",
     "electron:portableLinux": "npm run build && electron-builder build --linux appImage -p never",
-    "electron:portableMac": "npm run build && electron-builder build --mac dmg --universal -p never"
+    "electron:portableMac": "npm run build && electron-builder build --mac dmg --universal -p never",
+    "test": "jest"
   },
   "dependencies": {
     "@capacitor-community/electron": "^5.0.0",
@@ -30,16 +31,27 @@
     "electron-unhandled": "~4.0.1",
     "electron-updater": "^5.3.0",
     "electron-window-state": "^5.0.3",
-    "google-auth-library": "^11.3.1"
+    "google-auth-library": "^11.3.1",
+    "imapflow": "^2.12.0",
+    "nodemailer": "^10.6.0"
   },
   "devDependencies": {
-    "electron": "^26.2.2",
+    "@types/jest": "^30.0.0",
+    "@types/nodemailer": "^8.0.2",
+    "electron": "^45.3.2",
     "electron-builder": "~23.6.0",
     "electron-rebuild": "^3.2.9",
+    "jest": "^30.5.2",
+    "ts-jest": "^29.4.15",
     "typescript": "^5.0.4"
   },
   "keywords": [
     "capacitor",
     "electron"
-  ]
+  ],
+  "allowScripts": {
+    "@parcel/watcher@2.6.0": true,
+    "electron@26.6.10": true,
+    "lzma-native@8.0.6": true
+  }
 }

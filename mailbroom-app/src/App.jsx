@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import './App.css';
-import { gmailApi } from './gmail.js';
+import { mailService as gmailApi } from './mailService.js';
 import RefreshLogo from '@components/RefreshLogo';
 import LogoutButton from '@components/LogoutButton';
 import mailbroomLogo from './assets/mailbroomlogo.png';
 import Login from './Login';
 import UndoPopup from './UndoPopup';
 import SenderCard from './SenderCard';
-import { moveSenderToSpam } from './spamFilter';
 import BottomNav from './components/BottomNav';
 import LoadingBroom from './components/LoadingBroom';
 import Welcome from './components/Welcome';
@@ -129,9 +128,11 @@ export default function App() {
   const trashSenderMessages = async (entry) => {
     const result = await gmailApi.trashSenderMessages(entry.email);
     if (result.failed === 0) {
-      const entries = await reviewHistory.remove(entry.email);
-      historyRevision.current += 1;
-      setHistoryEntries(entries);
+      setTimeout(async () => {
+        const entries = await reviewHistory.remove(entry.email);
+        historyRevision.current += 1;
+        setHistoryEntries(entries);
+      }, 1200);
     }
     return result;
   };
@@ -143,9 +144,10 @@ export default function App() {
     const checkAutoLogin = async () => {
       setLoading(true);
       try {
-        const token = await gmailApi.authenticate(false);
-        if (token && isMounted) {
+        const creds = await gmailApi.getStoredCredentials();
+        if (creds && isMounted) {
           setIsAuthenticated(true);
+          setAccountEmail(creds.user || '');
           await loadSenders();
         }
       } catch (err) {
@@ -161,17 +163,23 @@ export default function App() {
     };
   }, [hasStarted]);
 
-  const handleLogin = async () => {
+  const handleLogin = async (credentials) => {
+    if (!credentials) {
+      setIsAuthenticated(false);
+      return;
+    }
     if (loginInFlight.current) return;
     loginInFlight.current = true;
     setLoading(true);
+    setStatus('');
     try {
-      await gmailApi.authenticate();
+      const creds = await gmailApi.authenticate(credentials);
       setIsAuthenticated(true);
+      setAccountEmail(creds?.user || credentials?.user || '');
       await loadSenders();
     } catch (error) {
       console.error('Login failed:', error);
-      setStatus("The sign in didn't complete. If this is your first time trying to use MailBroom, your Gmail address may not be approved for testing (yet)... Send it to the team and try again.");
+      setStatus("Sign in failed. Please check your App Password and try again.");
     } finally {
       loginInFlight.current = false;
       setLoading(false);
@@ -247,7 +255,6 @@ export default function App() {
 
   const handleUnsubscribe = async (s) => {
     const epoch = sessionEpoch.current;
-    const token = gmailApi.getToken();
     let outcome = 'requested';
     try {
       const result = await gmailApi.unsubscribe(s);
@@ -256,17 +263,10 @@ export default function App() {
       setStatus(result.message || `Unsubscribe requested for ${s.from}`);
     } catch (err) {
       console.error(err);
-      const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
       if (epoch !== sessionEpoch.current) return;
-      const filtered = await moveSenderToSpam(token, cleanEmail);
-      if (epoch !== sessionEpoch.current) return;
-      if (!filtered) {
-        setFailed((items) => [...items, s.from]);
-        setStatus(`Could not unsubscribe or filter ${s.from}. Please try again.`);
-        return;
-      }
-      outcome = 'filtered';
-      setStatus(`Unsubscribe failed. Future emails from ${s.from} will skip your inbox.`);
+      setFailed((items) => [...items, s.from]);
+      setStatus(err?.message || `Could not unsubscribe from ${s.from}. Please try again.`);
+      return;
     }
     if (epoch === sessionEpoch.current) await recordReview(s, outcome, epoch);
   };
@@ -341,18 +341,14 @@ export default function App() {
       {!isAuthenticated ? (
         <section className="login-panel" aria-label="Connect your inbox">
           <h2>A little less inbox clutter.</h2>
-          <p className="login-intro">Review your senders, keep what you love, and sweep away the rest.</p>
+          <p className="login-intro">Sign in with an App Password to scan your inbox and sweep away promotional clutter.</p>
           <Login onLogin={handleLogin} loading={loading} />
-          {loading && <LoadingBroom message="Connecting to Google..." />}
+          {loading && <LoadingBroom message="Connecting to mail server..." />}
           {status && (
             <p role="alert" style={{ maxWidth: 420, margin: '16px auto', color: '#b45309' }}>
               {status}
             </p>
           )}
-          <p style={{ maxWidth: 420, margin: '16px auto', color: '#6b7280', fontSize: 14 }}>
-            Google will warn that MailBroom is not verified. This is an expected warning...
-            Please click "Advanced", then "Go to MailBroom (unsafe)" to continue.
-          </p>
         </section>
       ) : (
         <div className="review-session">
