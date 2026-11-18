@@ -23,7 +23,11 @@ function SenderAvatar({ identity }) {
 
 export default function SenderCard({ senders, onDecision, swipePreference = 'both' }) {
   const [i, setI] = useState(0);
+
+  const [tally, setTally] = useState({ kept: 0, gone: 0, messages: 0 });
   const sender = senders[i];
+
+  useEffect(() => { setI(0); setTally({ kept: 0, gone: 0, messages: 0 }); }, [senders]);
   
   const drag = useRef({ active: false, startX: 0, dx: 0 });
   const card = useRef(null);
@@ -34,8 +38,14 @@ export default function SenderCard({ senders, onDecision, swipePreference = 'bot
   useEffect(() => () => clearTimeout(animationTimer.current), []);
 
   const decide = (action) => {
+    const keeping = action === 'keep';
+    setTally((t) => ({
+      kept: t.kept + (keeping ? 1 : 0),
+      gone: t.gone + (keeping ? 0 : 1),
+      messages: t.messages + (keeping ? 0 : sender.count || 0),
+    }));
     onDecision?.(sender, action);
-    setI(n => n + 1);
+        setI(n => n + 1);
     deciding.current = false;
     setAnimating(false);
   };
@@ -89,7 +99,15 @@ export default function SenderCard({ senders, onDecision, swipePreference = 'bot
   };
 
   if (!sender) {
-    return <section className="card-done" role="status"><h2>All swept up.</h2><p>You reviewed {i} senders. Your inbox thanks you.</p></section>;
+        return (
+      <section className="card-done" role="status">
+        <h2>All swept up.</h2>
+        <p>You reviewed {i} sender{i === 1 ? '' : 's'}: kept {tally.kept}, unsubscribed from {tally.gone}.</p>
+        {tally.messages > 0 && (
+          <p className="done-count">That's {tally.messages.toLocaleString()} message{tally.messages === 1 ? '' : 's'} that won't be back.</p>
+        )}
+      </section>
+    );
   }
 
   const identity = getSenderIdentity(sender.from);
