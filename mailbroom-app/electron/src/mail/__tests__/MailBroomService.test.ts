@@ -162,4 +162,24 @@ describe('MailBroomService', () => {
     expect(result.ok).toBe(false);
     expect(result.message).toMatch(/No unsubscribe link/);
   });
+
+  describe('deleteSenderMessages', () => {
+    test('connects, delegates to deleteMessagesBySender, returns count, and disconnects', async () => {
+      mockImap.deleteMessagesBySender.mockResolvedValue(5);
+
+      const count = await service.deleteSenderMessages('news@store.com');
+
+      expect(count).toBe(5);
+      expect(mockImap.connect).toHaveBeenCalledTimes(1);
+      expect(mockImap.deleteMessagesBySender).toHaveBeenCalledWith('news@store.com');
+      expect(mockImap.disconnect).toHaveBeenCalledTimes(1);
+    });
+
+    test('always disconnects even if deleteMessagesBySender throws', async () => {
+      mockImap.deleteMessagesBySender.mockRejectedValue(new Error('Connection dropped'));
+
+      await expect(service.deleteSenderMessages('news@store.com')).rejects.toThrow('Connection dropped');
+      expect(mockImap.disconnect).toHaveBeenCalledTimes(1);
+    });
+  });
 });

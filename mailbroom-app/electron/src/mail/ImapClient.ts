@@ -80,7 +80,7 @@ export class ImapClient {
   /**
    * Deletes all emails associated with a sender's email
    * @param senderEmail 
-   * @returns {Promise<number>} represenitn number of emails deleted
+   * @returns {Promise<number>} representing number of emails deleted
    */
   async deleteMessagesBySender(senderEmail: string): Promise<number> {
     if (!this.lock) throw new Error('Mailbox is not locked.');
@@ -91,7 +91,8 @@ export class ImapClient {
       return 0; // No messages found
     }
 
-    await this.client.messageFlagsAdd(sequenceArray, ['\\Deleted']);
+    // Two-step deletion: marks messages with \Deleted flag and executes EXPUNGE
+    await this.client.messageDelete(sequenceArray);
 
     return sequenceArray.length;
   }

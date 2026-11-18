@@ -167,11 +167,10 @@ export class MailBroomService {
 
   /**
    * Deletes all messages found associated of an email
-   * @param {string} target email
-   * @return {Promise<number>} representing number of emails deleted, 0 if none or failed
+   * @param {string} email Target email address
+   * @return {Promise<number>} Number of emails deleted
    */
-  async deleteSenderMessages(email: string): Promise<number>
-  {
+  async deleteSenderMessages(email: string): Promise<number> {
     await this.imap.connect();
     
     try {
@@ -179,7 +178,5 @@ export class MailBroomService {
     } finally {
       await this.imap.disconnect();
     }
-
-    return 0;
   }
 }

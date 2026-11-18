@@ -7,7 +7,6 @@ import mailbroomLogo from './assets/mailbroomlogo.png';
 import Login from './Login';
 import UndoPopup from './UndoPopup';
 import SenderCard from './SenderCard';
-import { moveSenderToSpam } from './spamFilter';
 import BottomNav from './components/BottomNav';
 import LoadingBroom from './components/LoadingBroom';
 import Welcome from './components/Welcome';
@@ -129,9 +128,11 @@ export default function App() {
   const trashSenderMessages = async (entry) => {
     const result = await gmailApi.trashSenderMessages(entry.email);
     if (result.failed === 0) {
-      const entries = await reviewHistory.remove(entry.email);
-      historyRevision.current += 1;
-      setHistoryEntries(entries);
+      setTimeout(async () => {
+        const entries = await reviewHistory.remove(entry.email);
+        historyRevision.current += 1;
+        setHistoryEntries(entries);
+      }, 1200);
     }
     return result;
   };
@@ -254,7 +255,6 @@ export default function App() {
 
   const handleUnsubscribe = async (s) => {
     const epoch = sessionEpoch.current;
-    const token = gmailApi.getToken();
     let outcome = 'requested';
     try {
       const result = await gmailApi.unsubscribe(s);
@@ -263,17 +263,10 @@ export default function App() {
       setStatus(result.message || `Unsubscribe requested for ${s.from}`);
     } catch (err) {
       console.error(err);
-      const cleanEmail = s.from.match(/<([^>]+)>/)?.[1] || s.from;
       if (epoch !== sessionEpoch.current) return;
-      const filtered = await moveSenderToSpam(token, cleanEmail);
-      if (epoch !== sessionEpoch.current) return;
-      if (!filtered) {
-        setFailed((items) => [...items, s.from]);
-        setStatus(`Could not unsubscribe or filter ${s.from}. Please try again.`);
-        return;
-      }
-      outcome = 'filtered';
-      setStatus(`Unsubscribe failed. Future emails from ${s.from} will skip your inbox.`);
+      setFailed((items) => [...items, s.from]);
+      setStatus(err?.message || `Could not unsubscribe from ${s.from}. Please try again.`);
+      return;
     }
     if (epoch === sessionEpoch.current) await recordReview(s, outcome, epoch);
   };
