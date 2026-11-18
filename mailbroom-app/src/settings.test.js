@@ -5,6 +5,7 @@ import { createSettingsStore, DEFAULT_SETTINGS, normalizeSettings, swipeAction }
 test('preferences default safely when values are missing or unsupported', () => {
   assert.deepEqual(normalizeSettings(), DEFAULT_SETTINGS);
   assert.deepEqual(normalizeSettings(null), DEFAULT_SETTINGS);
+  
   assert.deepEqual(normalizeSettings({ emailsPerSession: 999, swipePreference: 'anything' }), DEFAULT_SETTINGS);
 });
 
@@ -13,8 +14,10 @@ test('saved preferences survive reopening the settings store', async () => {
   const preferences = { get: async () => ({ value }), set: async (entry) => { value = entry.value; } };
   const store = createSettingsStore(preferences);
   assert.deepEqual(await store.read(), DEFAULT_SETTINGS);
-  await store.save({ emailsPerSession: 25, swipePreference: 'buttons' });
-  assert.deepEqual(await createSettingsStore(preferences).read(), { emailsPerSession: 50, swipePreference: 'buttons' });
+  
+  await store.save({ emailsPerSession: 100, swipePreference: 'buttons' });
+  
+  assert.deepEqual(await createSettingsStore(preferences).read(), { emailsPerSession: 100, swipePreference: 'buttons' });
 });
 
 test('swipe-only and both use the same directions, while buttons-only disables gestures', () => {

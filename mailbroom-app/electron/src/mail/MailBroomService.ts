@@ -25,7 +25,12 @@ export class MailBroomService {
     const bySender = new Map<string, Sender>();
 
     try {
-      const messages = await this.imap.fetchHeaders('1:*', ['list-unsubscribe', 'list-unsubscribe-post']);
+      //SCAN LIMIT ADDED: Scan enough emails to find unique senders (minimum 300)
+      const messages = await this.imap.fetchHeaders(
+        '1:*', 
+        ['list-unsubscribe', 'list-unsubscribe-post'], 
+        Math.max(300, limit * 2)
+      );
 
       for (const msg of messages) {
         const headerString = msg.headers ? msg.headers.toString('utf-8') : '';

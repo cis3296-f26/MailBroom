@@ -51,16 +51,21 @@ export class ImapClient {
    * If range is '1:*' and mailbox has many emails, fetches the most recent slice.
    * @param range Sequence range (defaults to recent window)
    * @param headers Array of headers to fetch (e.g., ['list-unsubscribe', 'list-unsubscribe-post'])
+   * @param scanLimit Maximum number of recent emails to scan (defaults to 300)
    * @returns Raw envelope and header data from ImapFlow
    */
-  async fetchHeaders(range: string = '1:*', headers: string[] = ['list-unsubscribe', 'list-unsubscribe-post']): Promise<any[]> {
+  async fetchHeaders(
+    range: string = '1:*', 
+    headers: string[] = ['list-unsubscribe', 'list-unsubscribe-post'],
+    scanLimit: number = 300 // Added scanLimit parameter
+  ): Promise<any[]> {
     const messages = [];
-
+    
     let targetRange = range;
-    // If range is '1:*', prefer targeting the latest 150 emails to avoid scanning thousands of historical emails
+    // If range is '1:*', prefer targeting the latest {scanLimit} emails to avoid scanning thousands of historical emails
     const mailboxExists = (this.client.mailbox as any)?.exists;
-    if (range === '1:*' && typeof mailboxExists === 'number' && mailboxExists > 150) {
-      targetRange = `${Math.max(1, mailboxExists - 150)}:*`;
+    if (range === '1:*' && typeof mailboxExists === 'number' && mailboxExists > scanLimit) {
+      targetRange = `${Math.max(1, mailboxExists - scanLimit)}:*`;
     }
 
     const fetchOptions = {

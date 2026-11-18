@@ -23,8 +23,9 @@ contextBridge.exposeInMainWorld('desktopAPI', {
     ipcRenderer.invoke('verify-credentials', config),
 
   // Email fetching & unsubscription
-  fetchEmails: (config: ProviderConfig) => 
-    ipcRenderer.invoke('fetch-emails', config),
+  // added limit parameter
+  fetchEmails: (config: ProviderConfig, limit: number = 50) => 
+    ipcRenderer.invoke('fetch-emails', config, limit),
     
   sendUnsubscribe: (config: ProviderConfig, candidate: Sender) => 
     ipcRenderer.invoke('send-unsubscribe', config, candidate),

@@ -2,10 +2,12 @@ import { Preferences } from '@capacitor/preferences';
 
 export const DEFAULT_SETTINGS = Object.freeze({ emailsPerSession: 50, swipePreference: 'both' });
 export const SWIPE_PREFERENCES = ['swipe', 'buttons', 'both'];
+export const ALLOWED_SESSIONS = [50, 100, 150, 200, 250, 300];
 
 export function normalizeSettings(value = {}) {
+  const parsedSession = Number(value?.emailsPerSession);
   return {
-    emailsPerSession: DEFAULT_SETTINGS.emailsPerSession,
+    emailsPerSession: ALLOWED_SESSIONS.includes(parsedSession) ? parsedSession : DEFAULT_SETTINGS.emailsPerSession,
     swipePreference: SWIPE_PREFERENCES.includes(value?.swipePreference) ? value.swipePreference : DEFAULT_SETTINGS.swipePreference,
   };
 }

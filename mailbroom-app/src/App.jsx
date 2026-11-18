@@ -18,9 +18,6 @@ import packageInfo from '../package.json';
 
 const UNDO_MS = 6000; // time for the user to undo an unsubscribe action
 
-
-
-
 export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
   const [activePage, setActivePage] = useState('Home');
@@ -91,6 +88,11 @@ export default function App() {
       settingsRef.current = saved;
       setSettings(saved);
       setSettingsMessage('Preferences saved.');
+
+      if (changes.emailsPerSession) {
+        setSenders([]);
+        loadSenders();
+      }
     } catch {
       setSettingsError('Your change could not be saved. Please try again.');
     } finally {
@@ -197,7 +199,7 @@ export default function App() {
 
     try {
       if (epoch !== sessionEpoch.current) return;
-      const data = await gmailApi.loadSenders();
+      const data = await gmailApi.loadSenders(settingsRef.current.emailsPerSession);
 
       if (gmailApi.isActive && data) {
         setSenders(data);
@@ -270,10 +272,9 @@ export default function App() {
     }
     if (epoch === sessionEpoch.current) await recordReview(s, outcome, epoch);
   };
-  
-    const scheduleUnsubscribe = async (s) => {
 
-      setPending((p) => [...p, s]);
+  const scheduleUnsubscribe = async (s) => {
+    setPending((p) => [...p, s]);
     timers.current[s.from] = setTimeout(() => {
       delete timers.current[s.from];
       setPending((p) => p.filter((x) => x.from !== s.from));
@@ -290,6 +291,7 @@ export default function App() {
   };
 
   const handleDecision = async (sender, action) => {
+    // Handle the actual app logic
     if (action === 'unsubscribe') {
       scheduleUnsubscribe(sender);
     } else {
@@ -374,7 +376,7 @@ export default function App() {
           )}
 
           {!loading && !loadError && senders.length === 0 && (
-            <p>No senders to review in this scan of up to 50 matching inbox emails.</p>
+            <p>No senders to review in this scan of up to {settings.emailsPerSession} matching inbox emails.</p>
           )}
         </div>
       )}

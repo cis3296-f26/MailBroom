@@ -26,11 +26,21 @@ export default function Settings({ settings, ready, saving, message, error, onCh
         <h2 className="settings-section-title" id="preferences-heading">Cleaning preferences</h2>
         <div className="settings-card preferences-card">
           <div className="setting-field">
-            <div className="setting-label-row"><SettingIcon type="mail" /><div className="setting-copy"><label htmlFor="session-size">Emails per session</label><p id="session-size-help">Scan up to 50 matching inbox emails.</p></div></div>
-            <select id="session-size" aria-describedby="session-size-help session-size-note" value={50} disabled>
+            <div className="setting-label-row"><SettingIcon type="mail" /><div className="setting-copy"><label htmlFor="session-size">Emails per session</label><p id="session-size-help">Scan up to your chosen number of matching inbox emails.</p></div></div>
+            <select 
+              id="session-size" 
+              aria-describedby="session-size-help" 
+              value={settings.emailsPerSession} 
+              disabled={!ready || saving} 
+              onChange={(event) => onChange({ emailsPerSession: Number(event.target.value) })}
+            >
               <option value={50}>50 emails</option>
+              <option value={100}>100 emails</option>
+              <option value={150}>150 emails</option>
+              <option value={200}>200 emails</option>
+              <option value={250}>250 emails</option>
+              <option value={300}>300 emails</option>
             </select>
-            <p className="setting-hint" id="session-size-note">Fixed at 50 for now. Custom session sizes are coming later.</p>
           </div>
           <div className="setting-field">
             <div className="setting-label-row"><SettingIcon type="swipe" /><div className="setting-copy"><label htmlFor="swipe-preference">Review controls</label><p id="swipe-help">Choose how you review senders.</p></div></div>
