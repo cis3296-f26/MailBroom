@@ -26,7 +26,7 @@ describe('MailBroomService', () => {
 
     expect(results).toEqual([]);
     expect(mockImap.connect).toHaveBeenCalledTimes(1);
-    expect(mockImap.fetchHeaders).toHaveBeenCalledWith('1:*', ['list-unsubscribe', 'list-unsubscribe-post']);
+    expect(mockImap.fetchHeaders).toHaveBeenCalledWith('1:*', ['list-unsubscribe', 'list-unsubscribe-post'], expect.any(Number));
     expect(mockImap.disconnect).toHaveBeenCalledTimes(1);
   });
 
