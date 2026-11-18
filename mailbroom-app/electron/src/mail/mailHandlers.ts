@@ -75,13 +75,15 @@ export function registerMailHandlers(ipcMain: IpcMain) {
   });
 
   // Fetch candidate senders with unsubscribe options
-  ipcMain.handle('fetch-emails', async (_event, config: ProviderConfig) => {
+  // Added limit parameter 
+  ipcMain.handle('fetch-emails', async (_event, config: ProviderConfig, limit: number = 50) => {
     try {
       const imap = new ImapClient(config);
       const smtp = new SmtpClient(config);
       const service = new MailBroomService(imap, smtp);
       
-      const candidates = await service.getUnsubscribeCandidates(50);
+      //PASSED limit 
+      const candidates = await service.getUnsubscribeCandidates(limit);
       return { success: true, data: candidates };
     } catch (error: any) {
       console.error('Failed to fetch emails:', error);
