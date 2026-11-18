@@ -130,9 +130,11 @@ export default function App() {
   const trashSenderMessages = async (entry) => {
     const result = await gmailApi.trashSenderMessages(entry.email);
     if (result.failed === 0) {
-      const entries = await reviewHistory.remove(entry.email);
-      historyRevision.current += 1;
-      setHistoryEntries(entries);
+      setTimeout(async () => {
+        const entries = await reviewHistory.remove(entry.email);
+        historyRevision.current += 1;
+        setHistoryEntries(entries);
+      }, 1200);
     }
     return result;
   };
@@ -265,7 +267,7 @@ export default function App() {
       console.error(err);
       if (epoch !== sessionEpoch.current) return;
       setFailed((items) => [...items, s.from]);
-      setStatus(`Could not unsubscribe from ${s.from}. Please try again.`);
+      setStatus(err?.message || `Could not unsubscribe from ${s.from}. Please try again.`);
       return;
     }
     if (epoch === sessionEpoch.current) await recordReview(s, outcome, epoch);
